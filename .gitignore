@@ -1,0 +1,10 @@
+*.npz
+data/*
+figures/*
+images/*
+notebook_scripts/*
+util/__pycache__/*
+.DS_Store
+
+!notebook_scripts/EvalTruncationPlayground.ipynb
+
