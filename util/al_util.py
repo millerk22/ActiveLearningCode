@@ -83,6 +83,15 @@ def V_opt_record(C, unlabeled, gamma2):
     return k_max, v_opt
 
 
+def V_opt_record2(u, C, unlabeled, gamma2, lam):
+    ips = np.array([np.inner(C[k,:], C[k,:]) for k in unlabeled]).flatten()
+    v_opt = ips/(gamma2 + np.diag(C)[unlabeled])
+    print(np.max(v_opt), np.min(v_opt))
+    v_opt += lam*(np.max(v_opt) + np.min(v_opt))*0.5*(1./np.absolute(u[unlabeled])) # add term that bias toward decision boundary
+    k_max = unlabeled[np.argmax(v_opt)]
+    return k_max, v_opt
+
+
 def Sigma_opt_record(C, unlabeled, gamma2):
     sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1)
     sums = np.asarray(sums).flatten()**2.
