@@ -2,24 +2,24 @@ import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 import scipy.sparse.linalg
-from scipy.optimize import lsq_linear
+from scipy.sparse import csgraph
+from scipy.optimize import lsq_linear, root
 import scipy.linalg as sla
+from scipy.stats import norm
 import matplotlib.pyplot as plt
 from itertools import product
+from itertools import permutations
 from scipy.optimize import newton, root_scalar
 from mpl_toolkits.mplot3d import Axes3D
-from scipy.sparse import csgraph
-import time
-from heapq import *
 from sklearn.datasets import make_moons
 import copy
-from itertools import permutations
-
+import time
 
 
 def get_init_post(C_inv, labeled, gamma2):
     """
     calculate the risk of each unlabeled point
+    C_inv: prior inverse (i.e. graph Laplacian L)
     """
     N = C_inv.shape[0]
     #unlabeled = list(filter(lambda x: x not in labeled, range(N)))
@@ -36,6 +36,7 @@ def calc_next_m(m, C, y, lab, k, y_k, gamma2):
     m_k = m + val*ck
     return m_k
 
+
 def get_probs(m, sigmoid=False):
     if sigmoid:
         return 1./(1. + np.exp(-3.*m))
@@ -45,7 +46,6 @@ def get_probs(m, sigmoid=False):
     m_probs[np.where(m_probs <0)] /= -2.*np.min(m_probs)
     m_probs += 0.5
     return m_probs
-
 
 
 def EEM_full(k, m, C, y, lab, unlab, m_probs, gamma2):
@@ -59,6 +59,7 @@ def EEM_full(k, m, C, y, lab, unlab, m_probs, gamma2):
     risk += (1.-m_at_k)*np.sum([min(m_k_m1[i], 1.- m_k_m1[i]) for i in range(N)])
     return risk
 
+
 def EEM_opt_record(m, C, y, labeled, unlabeled, gamma2):
     m_probs = get_probs(m)
     N = C.shape[0]
@@ -66,17 +67,6 @@ def EEM_opt_record(m, C, y, labeled, unlabeled, gamma2):
     k = np.argmin(risks)
     return k, risks
 
-
-
-def V_opt(C, unlabeled, gamma2):
-    ips = np.array([np.inner(C[k,:], C[k,:]) for k in unlabeled]).flatten()
-    v_opt = ips/(gamma2 + np.diag(C)[unlabeled])
-    v_opt = (v_opt - min(v_opt))/(max(v_opt) - min(v_opt))
-    colors = [(x, 0.5,(1-x)) for x in v_opt]
-    plt.scatter(X[unlabeled, 0],X[unlabeled,1], c=colors)
-    plt.show()
-    k_max = unlabeled[np.argmax(v_opt)]
-    return k_max
 
 def Sigma_opt(C, unlabeled, gamma2):
     sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1)
@@ -86,13 +76,12 @@ def Sigma_opt(C, unlabeled, gamma2):
     return k_max
 
 
-
-
 def V_opt_record(C, unlabeled, gamma2):
     ips = np.array([np.inner(C[k,:], C[k,:]) for k in unlabeled]).flatten()
     v_opt = ips/(gamma2 + np.diag(C)[unlabeled])
     k_max = unlabeled[np.argmax(v_opt)]
     return k_max, v_opt
+
 
 def Sigma_opt_record(C, unlabeled, gamma2):
     sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1)
@@ -100,9 +89,6 @@ def Sigma_opt_record(C, unlabeled, gamma2):
     s_opt = sums/(gamma2 + np.diag(C)[unlabeled])
     k_max = unlabeled[np.argmax(s_opt)]
     return k_max, s_opt
-
-
-
 
 
 def plot_iter(m, X, labels, labeled, k_next=-1):
@@ -139,5 +125,213 @@ def plot_iter(m, X, labels, labeled, k_next=-1):
     plt.scatter(X[sup2,0], X[sup2,1], marker='o', c='k', alpha=1.0)
     plt.axis('equal')
     plt.show()
-
     return
+
+
+def get_acc(u, labels):
+    u_ = np.sign(u)
+    u_[u_ == 0] = 1
+    corr = sum(1.*(u_ == labels))
+    return corr, corr/u.shape[0] 
+
+
+#%%
+################################################################################
+# MAP estimators of Probit model (with proper probit likelihood)
+################################################################################
+def pdf_deriv(t, gamma):
+    return -t*norm.pdf(t, scale = gamma)/(gamma**2)
+
+
+def hess_calc(uj_, yj_, gamma):
+    return -(pdf_deriv(uj_*yj_, gamma)*norm.cdf(uj_*yj_,scale=gamma) \
+           - norm.pdf(uj_*yj_,scale=gamma)**2) \
+           /(norm.cdf(uj_*yj_,scale=gamma)**2)
+
+
+def Hess(u, y, labeled, Lt, gamma, debug=False):
+    """
+    Assuming matrices are sparse, since L_tau should be relatively sparse, 
+        and we are perturbing with diagonal matrix.
+    """
+    H_d = np.zeros(u.shape[0])
+    for j, yj in zip(labeled, y):
+        H_d[j] = hess_calc(u[j], yj, gamma)
+    if debug:
+        print(H_d[np.nonzero(H_d)])
+    if np.any(H_d == np.inf):
+        print('smally')
+    return Lt + sp.sparse.diags(H_d, format='csr')
+
+
+def J(u, y, labeled, Lt, gamma, debug=False):
+    vec = np.zeros(u.shape[0])
+    for j, yj in zip(labeled,y):
+        vec[j] = -yj*norm.pdf(u[j]*yj, gamma)/norm.cdf(u[j]*yj, gamma)
+    if debug:
+        print(vec[np.nonzero(vec)])
+    return Lt @ u + vec
+
+
+def probit_map_dr(Z_, yvals, gamma, Ct):
+    """
+    Probit MAP estimator, using dimensionality reduction via Representer Theorem.
+    *** This uses cdf of normal distribution ***
+    """
+    Ctp = Ct[np.ix_(Z_,Z_)]
+    J = len(yvals)
+
+    def f(x):
+        vec = [yj*norm.pdf(x[j]*yj, scale=gamma)/norm.cdf(x[j]*yj, scale=gamma) for j,yj in enumerate(yvals)]
+        if np.any(vec == np.inf):
+            print('smally in f')
+        return x - Ctp @ vec
+    
+    def fprime(x):
+        H = -Ctp * np.array([(pdf_deriv(x[j]*yj,gamma)*norm.cdf(x[j]*yj,scale=gamma)
+                         - norm.pdf(x[j]*yj,scale=gamma)**2)/ (norm.cdf(x[j]*yj,scale=gamma)**2)
+                            for j, yj in enumerate(yvals)])
+        if np.any(H == np.inf):
+            print('smally')
+        H[np.diag_indices(J)] += 1.0
+        return H
+    
+    x0 = np.random.rand(J)
+    x0[np.array(yvals) < 0] *= -1
+    res = root(f, x0, jac=fprime)
+    print(np.allclose(0., f(res.x)))
+    tmp = sla.inv(Ctp) @ res.x
+    return Ct[:, Z_] @ tmp
+
+
+#%%
+################################################################################
+# Probit with logit likelihood
+################################################################################
+
+###################### Psi = cdf of logistic #######################
+def log_pdf(t, g):
+    return np.exp(-t/g)/(g*(1. + np.exp(-t/g)))
+
+
+def log_cdf(t, g):
+    return 1.0/(1.0 + np.exp(-t/g))
+
+
+def log_pdf_deriv(t, g):
+    return -np.exp(-t/g)/((g*(1. + np.exp(-t/g)))**2.)
+
+
+def hess_calc2(uj_, yj_, gamma):
+    return -(log_pdf_deriv(uj_*yj_, gamma) * log_cdf(uj_*yj_, gamma) \
+           -log_pdf(uj_*yj_, gamma)**2) / (log_cdf(uj_*yj_, gamma)**2)
+
+
+def Hess2(u, y, labeled, Lt, gamma, debug=False):
+    """
+    Assuming matrices are sparse, since L_tau should be relatively sparse, 
+        and we are perturbing with diagonal matrix.
+    """
+    H_d = np.zeros(u.shape[0])
+    for j, yj in zip(labeled, y):
+        H_d[j] = hess_calc2(u[j], yj, gamma)
+    if debug:
+        print(H_d[np.nonzero(H_d)])
+    if np.any(H_d == np.inf):
+        print('smally')
+    return Lt + sp.sparse.diags(H_d, format='csr')
+
+
+def J2(u, y, labeled, Lt, gamma, debug=False):
+    vec = np.zeros(u.shape[0])
+    for j, yj in zip(labeled,y):
+        vec[j] = -yj*log_pdf(u[j]*yj, gamma)/log_cdf(u[j]*yj, gamma)
+    if debug:
+        print(vec[np.nonzero(vec)])
+    return Lt @ u + vec
+
+
+def probit_map_dr2(Z_, yvals, gamma, Ct):
+    """
+    Probit MAP estimator, using dimensionality reduction via Representer Theorem.
+    *** This uses logistic cdf ***
+    """
+    
+    Ctp = Ct[np.ix_(Z_,Z_)]
+    J = len(yvals)
+    
+    def log_pdf(t):
+        return np.exp(-t/gamma)/(gamma*(1. + np.exp(-t/gamma)))
+    
+    def log_cdf(t):
+        return 1.0/(1.0 + np.exp(-t/gamma))
+    
+    def log_pdf_deriv(t):
+        return -np.exp(-t/gamma)/((gamma*(1. + np.exp(-t/gamma)))**2.)
+    
+    def f(x):
+        vec = [yj*log_pdf(x[j]*yj)/log_cdf(x[j]*yj) 
+               for j,yj in enumerate(yvals)]
+        return x - Ctp @ vec
+    
+    def fprime(x):
+        H = -Ctp * np.array([(log_pdf_deriv(x[j]*yj)*log_cdf(x[j]*yj)
+                         - log_pdf(x[j]*yj)**2) / (log_cdf(x[j]*yj)**2) 
+                            for j, yj in enumerate(yvals)])
+        if np.any(H == np.inf):
+            print('smally')
+        H[np.diag_indices(J)] += 1.0
+        return H
+    
+    x0 = np.random.rand(J)
+    x0[np.array(yvals) < 0] *= -1
+    res = root(f, x0, jac=fprime)
+    tmp = sla.inv(Ctp) @ res.x
+    return Ct[:, Z_] @ tmp
+
+
+#%%
+################################################################################
+# Spectral truncation
+################################################################################
+def probit_spectral_truncation(w, v, gamma, y, Z_ ):
+    N = v.shape[0]
+    n = v.shape[1]
+    def f(x):
+        vec = np.zeros(N)
+        tmp = v @ x
+        for i, yi in zip(Z_, y):
+            vec[i] = yi*norm.pdf(tmp[i]*yi, scale=gamma)/norm.cdf(tmp[i]*yi, scale=gamma)
+        return w * x  - v.T @ vec
+    def fprime(x):
+        tmp = v @ x
+        vec = np.zeros(N)
+        for i, yi in zip(Z_, y):
+            vec[i] = (pdf_deriv(tmp[i]*yi,gamma)*norm.cdf(tmp[i]*yi,scale=gamma)
+                         - norm.pdf(tmp[i]*yi,scale=gamma)**2)/ (norm.cdf(tmp[i]*yi,scale=gamma)**2)
+        H = -v.T @ sp.sparse.diags(vec, format='csr') @ v
+        if np.any(H == np.inf):
+            print('smally')
+        H[np.diag_indices(n)] += w
+        return H
+    x0 = np.random.rand(len(w))
+    res = root(f, x0, jac=fprime)
+    print(f"Root Finding is successful: {res.success}")
+    return v @ res.x
+
+
+def Hess_inv_st(u, y, labeled, w, v, gamma, debug=False):
+    """
+    Assuming matrices are sparse, since L_tau should be relatively sparse, 
+        and we are perturbing with diagonal matrix.
+    """
+    H_d = np.zeros(u.shape[0])
+    for j, yj in zip(labeled, y):
+        H_d[j] = hess_calc(u[j], yj, gamma)
+    if debug:
+        print(H_d[np.nonzero(H_d)])
+    if np.any(H_d == np.inf):
+        print('smally')
+    post = sp.sparse.diags(w, format='csr') \
+           + v.T @ sp.sparse.diags(H_d, format='csr') @ v
+    return v @ sp.linalg.inv(post) @ v.T
