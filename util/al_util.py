@@ -208,7 +208,7 @@ def probit_map_dr(Z_, yvals, gamma, Ct):
     x0 = np.random.rand(J)
     x0[np.array(yvals) < 0] *= -1
     res = root(f, x0, jac=fprime)
-    print(np.allclose(0., f(res.x)))
+    #print(np.allclose(0., f(res.x)))
     tmp = sla.inv(Ctp) @ res.x
     return Ct[:, Z_] @ tmp
 
