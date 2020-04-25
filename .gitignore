@@ -5,5 +5,5 @@ images/*
 notebook_scripts/*
 util/__pycache__/*
 .DS_Store
-
-
+*.npy
+*.py

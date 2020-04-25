@@ -88,7 +88,9 @@ class Graph_manager(object):
             sigma        = params['sigma'],
             zp_k         = params['zp_k'])
 
-        
+        W.setdiag(0)
+        W.eliminate_zeros()
+        self.W = W
         A = self.compute_laplacian(W,
             Ltype = params['Ltype'])
         w, v = self.compute_spectrum(A, n_eigs=params['n_eigs'])
