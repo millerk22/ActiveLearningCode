@@ -2,18 +2,15 @@ import numpy as np
 import scipy as sp
 import scipy.sparse as sps
 import scipy.sparse.linalg
-from scipy.sparse import csgraph
-from scipy.optimize import lsq_linear, root
+from scipy.optimize import root
 import scipy.linalg as sla
 from scipy.stats import norm
 import matplotlib.pyplot as plt
-from itertools import product
-from itertools import permutations
-from scipy.optimize import newton, root_scalar
-from mpl_toolkits.mplot3d import Axes3D
-from sklearn.datasets import make_moons
 import copy
 import time
+
+###############################################################################
+############### Gaussian Regression Helper Functions ##########################
 
 
 def get_init_post(C_inv, labeled, gamma2):
@@ -100,6 +97,12 @@ def Sigma_opt_record(C, unlabeled, gamma2):
     return k_max, s_opt
 
 
+
+
+################################################################################
+################## Plotting Helper Functions ###################################
+
+
 def plot_iter(m, X, labels, labeled, k_next=-1):
     '''
     Assuming labels are +1, -1
@@ -141,26 +144,31 @@ def get_acc(u, labels):
     u_ = np.sign(u)
     u_[u_ == 0] = 1
     corr = sum(1.*(u_ == labels))
-    return corr, corr/u.shape[0] 
+    return corr, corr/u.shape[0]
 
 
-#%%
+
+
+
+
 ################################################################################
-# MAP estimators of Probit model (with proper probit likelihood)
+########## MAP estimators of Probit model (with normal distribution's pdf )
 ################################################################################
+
+
 def pdf_deriv(t, gamma):
     return -t*norm.pdf(t, scale = gamma)/(gamma**2)
 
+def jac_calc(uj_, yj_, gamma):
+    return -yj_*(norm.pdf(uj_*yj_, scale=gamma)/norm.cdf(uj_*yj_, scale=gamma))
+
 
 def hess_calc(uj_, yj_, gamma):
-    return -(pdf_deriv(uj_*yj_, gamma)*norm.cdf(uj_*yj_,scale=gamma) \
-           - norm.pdf(uj_*yj_,scale=gamma)**2) \
-           /(norm.cdf(uj_*yj_,scale=gamma)**2)
-
+    return (norm.pdf(uj_*yj_,scale=gamma)**2 - pdf_deriv(uj_*yj_, gamma)*norm.cdf(uj_*yj_,scale=gamma))/(norm.cdf(uj_*yj_,scale=gamma)**2)
 
 def Hess(u, y, labeled, Lt, gamma, debug=False):
     """
-    Assuming matrices are sparse, since L_tau should be relatively sparse, 
+    Assuming matrices are sparse, since L_tau should be relatively sparse,
         and we are perturbing with diagonal matrix.
     """
     H_d = np.zeros(u.shape[0])
@@ -168,8 +176,8 @@ def Hess(u, y, labeled, Lt, gamma, debug=False):
         H_d[j] = hess_calc(u[j], yj, gamma)
     if debug:
         print(H_d[np.nonzero(H_d)])
-    if np.any(H_d == np.inf):
-        print('smally')
+    # if np.any(H_d == np.inf):
+    #     print('smally')
     return Lt + sp.sparse.diags(H_d, format='csr')
 
 
@@ -188,24 +196,23 @@ def probit_map_dr(Z_, yvals, gamma, Ct):
     *** This uses cdf of normal distribution ***
     """
     Ctp = Ct[np.ix_(Z_,Z_)]
-    J = len(yvals)
+    Jj = len(yvals)
 
     def f(x):
-        vec = [yj*norm.pdf(x[j]*yj, scale=gamma)/norm.cdf(x[j]*yj, scale=gamma) for j,yj in enumerate(yvals)]
+        vec = [jac_calc(x[j], yj, gamma) for j,yj in enumerate(yvals)]
         if np.any(vec == np.inf):
             print('smally in f')
-        return x - Ctp @ vec
-    
+        return x + Ctp @ vec
+
     def fprime(x):
-        H = -Ctp * np.array([(pdf_deriv(x[j]*yj,gamma)*norm.cdf(x[j]*yj,scale=gamma)
-                         - norm.pdf(x[j]*yj,scale=gamma)**2)/ (norm.cdf(x[j]*yj,scale=gamma)**2)
+        H = Ctp * np.array([hess_calc(x[j],yj, gamma)
                             for j, yj in enumerate(yvals)])
         if np.any(H == np.inf):
             print('smally')
-        H[np.diag_indices(J)] += 1.0
+        H[np.diag_indices(Jj)] += 1.0
         return H
-    
-    x0 = np.random.rand(J)
+
+    x0 = np.random.rand(Jj)
     x0[np.array(yvals) < 0] *= -1
     res = root(f, x0, jac=fprime)
     #print(np.allclose(0., f(res.x)))
@@ -213,14 +220,14 @@ def probit_map_dr(Z_, yvals, gamma, Ct):
     return Ct[:, Z_] @ tmp
 
 
-#%%
+
 ################################################################################
-# Probit with logit likelihood
+################### Probit with logit likelihood
 ################################################################################
 
 ###################### Psi = cdf of logistic #######################
 def log_pdf(t, g):
-    return np.exp(-t/g)/(g*(1. + np.exp(-t/g)))
+    return np.exp(-t/g)/(g*(1. + np.exp(-t/g)**2.))
 
 
 def log_cdf(t, g):
@@ -230,15 +237,16 @@ def log_cdf(t, g):
 def log_pdf_deriv(t, g):
     return -np.exp(-t/g)/((g*(1. + np.exp(-t/g)))**2.)
 
+def jac_calc2(uj_, yj_, gamma):
+    return -yj_*(np.exp(-uj_*yj_/gamma))/(gamma*(1.0 + np.exp(-uj_*yj_/gamma)))
 
 def hess_calc2(uj_, yj_, gamma):
-    return -(log_pdf_deriv(uj_*yj_, gamma) * log_cdf(uj_*yj_, gamma) \
-           -log_pdf(uj_*yj_, gamma)**2) / (log_cdf(uj_*yj_, gamma)**2)
+    return np.exp(-uj_*yj_/gamma)/(gamma**2. * (1. + np.exp(-uj_*yj_/gamma))**2.)
 
 
 def Hess2(u, y, labeled, Lt, gamma, debug=False):
     """
-    Assuming matrices are sparse, since L_tau should be relatively sparse, 
+    Assuming matrices are sparse, since L_tau should be relatively sparse,
         and we are perturbing with diagonal matrix.
     """
     H_d = np.zeros(u.shape[0])
@@ -254,7 +262,7 @@ def Hess2(u, y, labeled, Lt, gamma, debug=False):
 def J2(u, y, labeled, Lt, gamma, debug=False):
     vec = np.zeros(u.shape[0])
     for j, yj in zip(labeled,y):
-        vec[j] = -yj*log_pdf(u[j]*yj, gamma)/log_cdf(u[j]*yj, gamma)
+        vec[j] = jac_calc2(u[j], yj, gamma)
     if debug:
         print(vec[np.nonzero(vec)])
     return Lt @ u + vec
@@ -265,41 +273,31 @@ def probit_map_dr2(Z_, yvals, gamma, Ct):
     Probit MAP estimator, using dimensionality reduction via Representer Theorem.
     *** This uses logistic cdf ***
     """
-    
+
     Ctp = Ct[np.ix_(Z_,Z_)]
-    J = len(yvals)
-    
-    def log_pdf(t):
-        return np.exp(-t/gamma)/(gamma*(1. + np.exp(-t/gamma)))
-    
-    def log_cdf(t):
-        return 1.0/(1.0 + np.exp(-t/gamma))
-    
-    def log_pdf_deriv(t):
-        return -np.exp(-t/gamma)/((gamma*(1. + np.exp(-t/gamma)))**2.)
-    
+    Jj = len(yvals)
+
     def f(x):
-        vec = [yj*log_pdf(x[j]*yj)/log_cdf(x[j]*yj) 
+        vec = [jac_calc2(x[j], yj, gamma)
                for j,yj in enumerate(yvals)]
-        return x - Ctp @ vec
-    
+        return x + Ctp @ vec
+
     def fprime(x):
-        H = -Ctp * np.array([(log_pdf_deriv(x[j]*yj)*log_cdf(x[j]*yj)
-                         - log_pdf(x[j]*yj)**2) / (log_cdf(x[j]*yj)**2) 
+        H = Ctp * np.array([hess_calc2(x[j], yj, gamma)
                             for j, yj in enumerate(yvals)])
         if np.any(H == np.inf):
             print('smally')
-        H[np.diag_indices(J)] += 1.0
+        H[np.diag_indices(Jj)] += 1.0
         return H
-    
-    x0 = np.random.rand(J)
+
+    x0 = np.random.rand(Jj)
     x0[np.array(yvals) < 0] *= -1
     res = root(f, x0, jac=fprime)
     tmp = sla.inv(Ctp) @ res.x
     return Ct[:, Z_] @ tmp
 
 
-#%%
+
 ################################################################################
 # Spectral truncation
 ################################################################################
@@ -331,16 +329,16 @@ def probit_spectral_truncation(w, v, gamma, y, Z_ ):
 
 def Hess_inv_st(u, y, labeled, w, v, gamma, debug=False):
     """
-    Assuming matrices are sparse, since L_tau should be relatively sparse, 
+    Assuming matrices are sparse, since L_tau should be relatively sparse,
         and we are perturbing with diagonal matrix.
     """
     H_d = np.zeros(u.shape[0])
     for j, yj in zip(labeled, y):
         H_d[j] = hess_calc(u[j], yj, gamma)
-    if debug:
-        print(H_d[np.nonzero(H_d)])
-    if np.any(H_d == np.inf):
-        print('smally')
+    # if debug:
+    #     print(H_d[np.nonzero(H_d)])
+    # if np.any(H_d == np.inf):
+    #     print('smally')
     post = sp.sparse.diags(w, format='csr') \
            + v.T @ sp.sparse.diags(H_d, format='csr') @ v
     return v @ sp.linalg.inv(post) @ v.T
