@@ -1,5 +1,6 @@
 # author: Kevin Miller
 import numpy as np
+from scipy.stats import norm
 
 
 '''
@@ -147,10 +148,10 @@ def EE_gr(k, m, C, y, labeled, unlabeled, m_probs, gamma):
     '''
     N = C.shape[0]
     m_at_k = m_probs[k]
-    m_k_p1 = calc_next_m_gr(m, C, y, labeled, k, 1., gamma**2.)
+    m_k_p1 = next_m_gr(m, C, y, labeled, k, 1., gamma**2.)
     m_k_p1 = get_probs_gr(m_k_p1)
     risk = m_at_k*np.sum([min(m_k_p1[i], 1.- m_k_p1[i]) for i in range(N)])
-    m_k_m1 = calc_next_m_gr(m, C, y, labeled, k, -1., gamma**2.)
+    m_k_m1 = next_m_gr(m, C, y, labeled, k, -1., gamma**2.)
     m_k_m1 = get_probs_gr(m_k_m1)
     risk += (1.-m_at_k)*np.sum([min(m_k_m1[i], 1.- m_k_m1[i]) for i in range(N)])
     return risk
@@ -182,22 +183,62 @@ def vopt_p(C, unlabeled, gamma, m, dumb=False, probit_norm=False):
         v_opt = ips/(gamma**2. + np.diag(C)[unlabeled])
     else:
         if probit_norm:
-            # take the "worst case" labeling
-            v_opt = ips/ np.array([hess_calc2(m[k], -np.sign(m[k]), gamma) for k in unlabeled])
+            # take the "best case" labeling -- MAYBE do weighted average?
+            v_opt = ips * np.array([hess_calc(m[k], np.sign(m[k]), gamma)/(hess_calc(m[k], np.sign(m[k]), gamma)*C[k,k] + 1.) for k in unlabeled])
         else:
-            # take the "worst case" labeling
-            v_opt = ips/ np.array([hess_calc2(m[k], -np.sign(m[k]), gamma) for k in unlabeled])
+            # take the "best case" labeling -- MAYBE do weighted average?
+            v_opt = ips * np.array([hess_calc2(m[k], np.sign(m[k]), gamma)/(hess_calc2(m[k], np.sign(m[k]), gamma)*C[k,k] + 1.) for k in unlabeled])
     k_max = unlabeled[np.argmax(v_opt)]
     return k_max
 
 
-def modelchange_p(C, unlabeled, gamma, m):
-    return
+def modelchange_p(C, unlabeled, gamma, m, probit_norm=False):
+    if probit_norm:
+        mc = [min(np.absolute(jac_calc(m[k], -1, gamma)/(1. + C[k,k]*hess_calc(m[k], -1, gamma ))), \
+           np.absolute(jac_calc(m[k], 1, gamma)/(1. + C[k,k]*hess_calc(m[k], 1, gamma )))) \
+                       * np.linalg.norm(C[k,:]) for k in unlabeled]
+    else:
+        mc = [min(np.absolute(jac_calc2(m[k], -1, gamma)/(1. + C[k,k]*hess_calc2(m[k], -1, gamma ))), \
+           np.absolute(jac_calc2(m[k], 1, gamma)/(1. + C[k,k]*hess_calc2(m[k], 1, gamma )))) \
+                       * np.linalg.norm(C[k,:]) for k in unlabeled]
+    k_mc = np.argmax(mc)
+    return k_mc
 
 
 
-def mbr_p(C, unlabeled, gamma, m):
+# Helper functions for MBR probit adaptation
+def logistic_cdf(t, scale):
+    return 1.0/(1.0 + np.exp(-t/scale))
+
+
+def EE_p(k, m, C, gamma, probit_norm=False):
+    '''
+    Calculate the EE (expected error) in the Gaussian Regression model; that is,
+    adapted the MBR criterion from Harmonic functions to fit the Gaussian Regression
+    model (in which we have +1, -1 labels, and soft labelings).
+    '''
+    if probit_norm:
+        cdf_func = norm.cdf
+        jac_func = jac_calc
+        hess_func = hess_calc
+    else:
+        cdf_func = logistic_cdf
+        jac_func = jac_calc2
+        hess_func = hess_calc2
+
+    # Get Newton Approximation of plus k, +1 optimizer
+    m_k_p1 = m - jac_func(m[k], 1, gamma)/(1. + C[k,k]*hess_func(m[k], 1, gamma))*C[k,:]
+    risk = cdf_func(m[k], scale=gamma)*np.sum([cdf_func(-abs(m_k_p1[i]), scale=gamma) for i in range(m.shape[0])])
+
+    # Get Newton Approximation of plus k, -1 optimizer
+    m_k_m1 = m - jac_func(m[k], -1, gamma)/(1. + C[k,k]*hess_func(m[k], -1, gamma ))*C[k,:]
+    risk += cdf_func(-m[k], scale=gamma)*np.sum([cdf_func(-abs(m_k_m1[i]), scale=gamma) for i in range(m.shape[0])])
+    return risk
+
+def mbr_p(C, unlabeled, gamma, m, probit_norm=False):
     '''
     I think we can do MBR (EEM) in the Probit case, maybe this is useful?
     '''
-    return
+    mbr = [EE_p(k, m, C, gamma, probit_norm) for k in unlabeled]
+    k_mbr = np.argmin(mbr)
+    return k_mbr
