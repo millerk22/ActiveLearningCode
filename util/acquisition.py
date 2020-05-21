@@ -1,6 +1,7 @@
 # author: Kevin Miller
 import numpy as np
 from scipy.stats import norm
+from util.al_util import *
 
 
 '''
@@ -75,7 +76,7 @@ def mbr_hf(C, m, **kwargs):
         original index {1, 2, ..., N}
     '''
     if np.max(m) > 1. or np.min(m) < 0.:
-        raise ValueError("Harmonic Function must have be between 0 and 1. Either your  \
+        raise ValueError("Harmonic Function must have values between 0 and 1. Either your  \
         Graph Laplacian is not unnormalized, or you have given invalid labelings other than \
         0 and 1...")
 
@@ -167,6 +168,15 @@ def mbr_gr(C, unlabeled, gamma, m, y):
     k_gbr = unlabeled[np.argmin(risks)]
     return k_gbr
 
+def modelchange_gr(C, unlabeled, gamma, m):
+    '''
+    Compute the model change criterion under the probit model (with Gaussian approximations of Probit posterior).
+    '''
+    mc = [min(np.absolute(1. - m[k])/(gamma**2. + C[k,k]), np.absolute(-1. - m[k])/(gamma**2. + C[k,k])) \
+                       * np.linalg.norm(C[k,:]) for k in unlabeled]
+    k_mc = unlabeled[np.argmax(mc)]
+    return k_mc
+
 
 
 
@@ -193,6 +203,9 @@ def vopt_p(C, unlabeled, gamma, m, dumb=False, probit_norm=False):
 
 
 def modelchange_p(C, unlabeled, gamma, m, probit_norm=False):
+    '''
+    Compute the model change criterion under the probit model (with Gaussian approximations of Probit posterior).
+    '''
     if probit_norm:
         mc = [min(np.absolute(jac_calc(m[k], -1, gamma)/(1. + C[k,k]*hess_calc(m[k], -1, gamma ))), \
            np.absolute(jac_calc(m[k], 1, gamma)/(1. + C[k,k]*hess_calc(m[k], 1, gamma )))) \
@@ -201,7 +214,7 @@ def modelchange_p(C, unlabeled, gamma, m, probit_norm=False):
         mc = [min(np.absolute(jac_calc2(m[k], -1, gamma)/(1. + C[k,k]*hess_calc2(m[k], -1, gamma ))), \
            np.absolute(jac_calc2(m[k], 1, gamma)/(1. + C[k,k]*hess_calc2(m[k], 1, gamma )))) \
                        * np.linalg.norm(C[k,:]) for k in unlabeled]
-    k_mc = np.argmax(mc)
+    k_mc = unlabeled[np.argmax(mc)]
     return k_mc
 
 
@@ -240,5 +253,5 @@ def mbr_p(C, unlabeled, gamma, m, probit_norm=False):
     I think we can do MBR (EEM) in the Probit case, maybe this is useful?
     '''
     mbr = [EE_p(k, m, C, gamma, probit_norm) for k in unlabeled]
-    k_mbr = np.argmin(mbr)
+    k_mbr = unlabeled[np.argmin(mbr)]
     return k_mbr

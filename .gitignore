@@ -6,4 +6,6 @@ notebook_scripts/*
 util/__pycache__/*
 .DS_Store
 *.npy
-f_plot.py
+f_plot*.py
+util/al_util_clean.py
+
