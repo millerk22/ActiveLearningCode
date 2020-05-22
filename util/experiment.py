@@ -49,9 +49,12 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
 
     def get_C(Z, y, m):
         if classifier in ["probit", "probit-st"]:
-            return Hess_inv_st(m, y, Z, 1./d, v, gamma)
-        elif classifier in ["probit2"]:
-            return sp.linalg.inv(Hess(m, y, Z, Ct_inv, gamma))
+            if len(y) > n_eig:
+                return Hess_inv_st(m, y, Z, 1./d, v, gamma)
+            else:
+                return Hess_inv(m, y, Z, gamma, Ct)
+        elif classifier in ["probit2", "probit2-st"]:
+            return Hess2_inv(m, y, Z, gamma, Ct)
         else: 
             pass
         
