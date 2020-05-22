@@ -342,3 +342,11 @@ def Hess_inv_st(u, y, labeled, w, v, gamma, debug=False):
     post = sp.sparse.diags(w, format='csr') \
            + v.T @ sp.sparse.diags(H_d, format='csr') @ v
     return v @ sp.linalg.inv(post) @ v.T
+
+def Hess_inv(u, y, labeled, gamma, Ct):
+    Ctp = Ct[np.ix_(labeled, labeled)]
+    H_d = np.zeros(y.shape[0])
+    for i, (j, yj) in enumerate(zip(labeled, y)):
+        H_d[i] = 1./hess_calc(u[j], yj, gamma)
+    temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
+    return Ct - Ct[:, labeled] @ temp @ Ct[labeled, :]
