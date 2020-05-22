@@ -118,7 +118,7 @@ def plot_iter(m, X, labels, labeled, k_next=-1, title=None, subplot=False):
     corr2 = list(set(m2).intersection(set(np.where(labels == -1)[0])))
     incorr2 = list(set(m1).intersection(set(np.where(labels == -1)[0])))
 
-    print("num incorrect = %d" % (len(incorr1) + len(incorr2)))
+    print("\tnum incorrect = %d" % (len(incorr1) + len(incorr2)))
 
     if k_next >= 0:
         plt.scatter(X[k_next,0], X[k_next,1], marker= 's', c='y', alpha= 0.7, s=200) # plot the new points to be included

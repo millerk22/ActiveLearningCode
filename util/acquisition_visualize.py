@@ -118,8 +118,9 @@ class ActiveLearningAcquisition(object):
         '''
         self.name = 'Sigma opt-gr'
         sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1)
-        sums = np.asarray(sums).flatten()**2.
-        s_opt = sums/(gamma**2. + np.diag(C)[unlabeled])
+        #sums = np.asarray(sums).flatten()**2.
+        #s_opt = sums/(gamma**2. + np.diag(C)[unlabeled])
+        s_opt = (sums**2.)/(gamma**2. + np.diag(C)[unlabeled])
         k_max = unlabeled[np.argmax(s_opt)]
         return k_max, s_opt
 
