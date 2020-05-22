@@ -8,4 +8,5 @@ util/__pycache__/*
 *.npy
 f_plot*.py
 util/al_util_clean.py
+datasets/__pycache__/
 
