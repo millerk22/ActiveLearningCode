@@ -126,15 +126,15 @@ if __name__ == "__main__":
     m_grn = (C_grn @ y)/(gamma**2.)
 
     # Harmonic Function model mean and posterior covariance
-    # C_hf = np.linalg.inv(tau**2. * Lt[np.ix_(unlabeled, unlabeled)])  # remove the extra scaling in the front of Lt to exactly follow HF
-    # m_hf = -C_hf@ (tau**2. * Lt)[np.ix_(unlabeled, labeled)] @ y_hf
-    C_hf = np.linalg.inv(Lt[np.ix_(unlabeled, unlabeled)])  # remove the extra scaling in the front of Lt to exactly follow HF
-    m_hf = -C_hf@ (Lt)[np.ix_(unlabeled, labeled)] @ y_hf
+    C_hf = np.linalg.inv(tau**2. * Lt[np.ix_(unlabeled, unlabeled)])  # remove the extra scaling in the front of Lt to exactly follow HF
+    m_hf = -C_hf@ (tau**2. * Lt)[np.ix_(unlabeled, labeled)] @ y_hf
+    # C_hf = np.linalg.inv(Lt[np.ix_(unlabeled, unlabeled)])  # remove the extra scaling in the front of Lt to exactly follow HF
+    # m_hf = -C_hf@ (Lt)[np.ix_(unlabeled, labeled)] @ y_hf
     m_hf_full[unlabeled] = m_hf
 
     if args.init_plot:
-        # print('Dataset')
-        # plot_iter(labels, X, labels, labeled, title='Dataset (no classifier)')
+        print('Dataset')
+        plot_iter(labels, X, labels, labeled, title='Dataset (no classifier)')
 
         print('Showing plots of different classifiers')
         print('probit (normalized GL)')
