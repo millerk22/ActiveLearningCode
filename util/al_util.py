@@ -103,7 +103,7 @@ def Sigma_opt_record(C, unlabeled, gamma2):
 ################## Plotting Helper Functions ###################################
 
 
-def plot_iter(m, X, labels, labeled, k_next=-1):
+def plot_iter(m, X, labels, labeled, k_next=-1, title=None, subplot=False):
     '''
     Assuming labels are +1, -1
     '''
@@ -124,7 +124,10 @@ def plot_iter(m, X, labels, labeled, k_next=-1):
         plt.scatter(X[k_next,0], X[k_next,1], marker= 's', c='y', alpha= 0.7, s=200) # plot the new points to be included
         plt.title(r'Dataset with Label for %s added' % str(k_next))
     elif k_next == -1:
-        plt.title(r'Dataset with Initial Labeling')
+        if not title:
+            plt.title(r'Dataset with Initial Labeling')
+        else:
+            plt.title(title)
 
     plt.scatter(X[corr1,0], X[corr1,1], marker='x', c='b', alpha=0.2)
     plt.scatter(X[incorr1,0], X[incorr1,1], marker='x', c='r', alpha=0.2)
@@ -136,6 +139,8 @@ def plot_iter(m, X, labels, labeled, k_next=-1):
     plt.scatter(X[sup1,0], X[sup1,1], marker='x', c='k', alpha=1.0)
     plt.scatter(X[sup2,0], X[sup2,1], marker='o', c='k', alpha=1.0)
     plt.axis('equal')
+    if subplot:
+        return
     plt.show()
     return
 

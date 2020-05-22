@@ -1,9 +1,11 @@
 from util.al_util import *
 from util.Graph_manager import Graph_manager
-from sklearn.datasets import make_moons
+from sklearn.datasets import make_moons, load_breast_cancer
+from sklearn.decomposition import PCA
 import argparse
 from util.acquisition import *
 from util.acquisition_visualize import ActiveLearningAcquisition as ALA
+#from datasets.data_loaders_mlflow import
 import os
 
 
@@ -21,7 +23,7 @@ def plot_criterion(vals, k, unlabeled, labeled, X, title='Model Change', **kwarg
     plt.title(title)
 
     if 'saveloc' in kwargs.keys():
-        plt.savefig(saveloc + ''.join(title.split()) + '.png')
+        plt.savefig(kwargs['saveloc'] + ''.join(title.split()) + '.png')
     if 'subplot' in kwargs.keys():
         if not kwargs['subplot']:
             plt.show()
@@ -47,36 +49,43 @@ if __name__ == "__main__":
     argparser.add_argument('--subplot', default=False, type=str2bool, help='option to fit all plots onto same figure')
     argparser.add_argument('--saveloc', default='./', type=str, help='file location to store AL plots')
     argparser.add_argument('--init_plot', default=True, type=str2bool, help='option to show initial classification results plot')
+    argparser.add_argument('--seed', default=42, type=int, help='seed for reproducibility of results')
     args= argparser.parse_args()
 
 
-    # Setup graph
+    if not os.path.isdir(args.saveloc):
+        os.mkdir(args.saveloc)
+
+
+    # Setup Dataset
     # 2 moons
     N = 1000
-    X, labels = make_moons(N, noise=0.15)
+    X, labels = make_moons(N, noise=0.15, random_state=args.seed)
+    # X_full, labels = load_breast_cancer(return_X_y=True)
+    # pca = PCA(n_components=2)
+    # X = pca.fit_transform(X_full)
+    # N = labels.shape[0]
     labels[np.where(labels == 0)] = -1
     ind_ord = list(np.where(labels == -1)[0]) + list(np.where(labels == 1)[0])
     ind_ordnp = np.array(ind_ord)
 
+    # Choose labeled points
+    n_start = 10
+    np.random.seed(args.seed)
+    labeled =  list(np.random.choice(np.where(labels == -1)[0],  size=n_start//2, replace=False))
+    labeled += list(np.random.choice(np.where(labels ==  1)[0], size=n_start//2, replace=False))
+    unlabeled = list(filter(lambda x: x not in labeled, range(N)))
 
-    n_start = 5
-    ans = 'n'
-    while ans != 'y':
-        labeled = list(np.random.choice(list(range(N)), size=n_start, replace=False))
-        while sum(labels[labeled]) == n_start or sum(labels[labeled]) == 0:
-            print('Rechoosing to get both clusters')
-            labeled = list(np.random.choice(list(range(N)), size=n_start, replace=False))
 
-        unlabeled = list(filter(lambda x: x not in labeled, range(N)))
-        plot_iter(labels, X, labels, labeled)
-
-        print("Is this setup acceptable? Please input 'y' or 'n':")
-        ans = input()
-
+    # create the vector H^Ty, already in N -dim!
     y = np.zeros(N)
     y[labeled] = labels[labeled]
+    m_hf_full = y.copy()
+    m_hf_full[np.where(y == -1)] = 0.
+    y_hf = m_hf_full[labeled]
 
-    # Create similarity graph -- Normalized GL
+
+    # Create similarity graphs -- Normalized and Unnormalized GL
     neig = None
     knn_ = 15
     graph_params = {
@@ -84,88 +93,128 @@ if __name__ == "__main__":
         'sigma'  : 3.,
         'Ltype'  : 'normed',
         'n_eigs' : neig,
-        'zp_k'   : None
+        'zp_k'   : 5
     }
+
     gm = Graph_manager()
+    wn, vn = gm.from_features(X, graph_params, debug=True)
+
+    graph_params['Ltype'] = 'unnormalized'
     w, v = gm.from_features(X, graph_params, debug=True)
 
 
-    # Construct prior covariance and precision matrix
+
+
+    # Construct prior covariance and precision matrix for Unnormalized
     tau, gamma = args.tau, args.gamma
-    d = (tau ** (2.)) * ((w + tau**2.) ** (-1.))
+    d = (tau ** (2.)) * ((w + tau**2.) ** (-1.))  # # unnormalized
     Ct = v @ sp.sparse.diags(d, format='csr') @ v.T
     Lt = v @ sp.sparse.diags(1./d, format='csr') @ v.T
+    dn = (tau ** (2.)) * ((wn + tau**2.) ** (-1.))  # normalized
+    Ctn = vn @ sp.sparse.diags(dn, format='csr') @ vn.T
+    Ltn = vn @ sp.sparse.diags(1./dn, format='csr') @ vn.T
 
 
 
-    m = probit_map_dr2(labeled, labels[labeled], gamma, Ct)
-    H = Hess2(m, labels[labeled], labeled, Lt, gamma)
+    # Probit model MAP estimator and posterior covariance
+    m = probit_map_dr2(labeled, labels[labeled], gamma, Ctn) # normalized
+    H = Hess2(m, labels[labeled], labeled, Ltn, gamma)
     C = sp.linalg.inv(H)
 
+
+    # Gaussian Regression model mean and posterior covariance
+    C_gr = get_init_post(Lt, labeled, gamma**2.) # unnormalized
+    m_gr = (C_gr @ y)/(gamma**2.)
+    C_grn = get_init_post(Ltn, labeled, gamma**2.)  #normalized
+    m_grn = (C_grn @ y)/(gamma**2.)
+
+    # Harmonic Function model mean and posterior covariance
+    C_hf = np.linalg.inv(tau**2. * Lt[np.ix_(unlabeled, unlabeled)])  # remove the extra scaling in the front of Lt to exactly follow HF
+    m_hf = -C_hf@ (tau**2. * Lt)[np.ix_(unlabeled, labeled)] @ y_hf
+    m_hf_full[unlabeled] = m_hf
+
     if args.init_plot:
-        plot_iter(m, X, labels, labeled)
+        print('Dataset')
+        plot_iter(labels, X, labels, labeled, title='Dataset (no classifier)')
+
+        print('Showing plots of different classifiers')
+        print('probit (normalized GL)')
+        plt.subplot(2,2,1)
+        plot_iter(m, X, labels, labeled, title='Probit (normalized G.L.)', subplot=True)
+        print('gr (unnormalized GL)')
+        plt.subplot(2,2,2)
+        plot_iter(m_gr, X, labels, labeled, title='GR (unnormalized GL)', subplot=True)
+        print('gr (normalized GL)')
+        plt.subplot(2,2,3)
+        plot_iter(m_grn, X, labels, labeled, title='GR (normalized GL)', subplot=True)
+        print('hf (unnormalized GL, w/o front scaling)')
+        plt.subplot(2,2,4)
+        plot_iter(2.*m_hf_full - 1., X, labels, labeled, title='HF (unnormalized GL)', subplot=True)
+        plt.suptitle('Classification Visualization')
+        plt.savefig(args.saveloc + 'class-visual-2moons')
+        plt.show()
+
+
+        print("Showing the MAP estimators of the different models")
+        plt.subplot(1,2,1)
+        plt.scatter(range(N), m[ind_ord], marker='.', s=20, label='probit')
+        plt.scatter(range(N), m_grn[ind_ord], marker='^', s=10, label='GR n')
+        plt.legend()
+        plt.subplot(1,2,2)
+        plt.scatter(range(N), m_gr[ind_ord], c='r', marker='x', s=10, label='GR u')
+        plt.scatter(range(N), 2.*m_hf_full[ind_ord] - 1., c='g', marker='o', s=10, label='HF')
+        plt.legend()
+        plt.suptitle('MAP Estimator Visualization')
+        plt.savefig(args.saveloc + 'MAP-visual-2moons')
+        plt.show()
+
+
+
 
     if args.subplot:
-        plt.figure(figsize=(10,12))
+        plt.figure(figsize=(12,6))
+
+
     # Active Learning Visualization of different criterion
     ala = ALA()
-    for i, f in enumerate([ala.vopt_grv, ala.vopt_pv, ala.mbr_grv, ala.mbr_pv, \
-                    ala.modelchange_grv, ala.modelchange_pv, ala.sopt_grv]):
-        k, vals = f(C=C, unlabeled=unlabeled, gamma=gamma, m=m, y=y)
+
+
+    ofs = 0
+    for i, f in enumerate([ala.vopt_hfv,  ala.mbr_hfv,  ala.sopt_hfv]):
+        k, vals = f(C=C_hf, m=m_hf, y=y)
+        k = unlabeled[k] # need to get the proper index in unlabeled since this criterion only considers the unlabeled submatrix
         if args.subplot:
-            plt.subplot(4,2,i+1)
+            if i == 2:
+                plt.subplot(3,4,4*ofs+i+2)
+            else:
+                plt.subplot(3,4,4*ofs+i+1)
             plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), subplot=args.subplot)
         else:
             plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), saveloc=args.saveloc)
 
+    ofs = 1
+    print('Normalized GR')
+    for i, f in enumerate([ala.vopt_grv,  ala.mbr_grv, ala.modelchange_grv, ala.sopt_grv]):
+        k, vals = f(C=C_grn, unlabeled=unlabeled, gamma=gamma, m=m_grn, y=y)
+        if args.subplot:
+            plt.subplot(3,4,4*ofs+i+1)
+            plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), subplot=args.subplot)
+        else:
+            plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), saveloc=args.saveloc)
+
+
+    ofs = 2
+    for i, f in enumerate([ala.vopt_pv, ala.mbr_pv, ala.modelchange_pv]):
+        k, vals = f(C=C, unlabeled=unlabeled, gamma=gamma, m=m)
+        if args.subplot:
+            plt.subplot(3,4,4*ofs+i+1)
+            plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), subplot=args.subplot)
+        else:
+            plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), saveloc=args.saveloc)
+
+
+
     if args.subplot:
-        plt.suptitle('Normalized Graph Laplacian Plots')
+        plt.suptitle('Active Learning Plots')
         plt.savefig(args.saveloc + 'active-learning-2moons-n')
         plt.show()
-
-
-
-    # Unnormalized Graph Laplacian calculations
-    graph_params = {
-        'knn'    : knn_,
-        'sigma'  : 3.,
-        'Ltype'  : 'unnormalized',
-        'n_eigs' : neig,
-        'zp_k'   : None
-    }
-    gm = Graph_manager()
-    w, v = gm.from_features(X, graph_params, debug=True)
-
-
-    # Construct prior covariance and precision matrix
-    tau, gamma = args.tau, args.gamma
-    d = (tau ** (2.)) * ((w + tau**2.) ** (-1.))
-    Ct = v @ sp.sparse.diags(d, format='csr') @ v.T
-    Lt = v @ sp.sparse.diags(1./d, format='csr') @ v.T
-
-
-
-    m = probit_map_dr2(labeled, labels[labeled], gamma, Ct)
-    H = Hess2(m, labels[labeled], labeled, Lt, gamma)
-    C = sp.linalg.inv(H)
-
-    if args.init_plot:
-        plot_iter(m, X, labels, labeled)
-    if args.subplot:
-        plt.figure(figsize=(10,12))
-    # Active Learning Visualization of different criterion
-    ala = ALA()
-    for i, f in enumerate([ala.vopt_grv, ala.vopt_pv, ala.mbr_grv, ala.mbr_pv, \
-                    ala.modelchange_grv, ala.modelchange_pv, ala.sopt_grv]):
-        k, vals = f(C=C, unlabeled=unlabeled, gamma=gamma, m=m, y=y)
-        if args.subplot:
-            plt.subplot(4,2,i+1)
-            plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), subplot=args.subplot)
-        else:
-            plot_criterion(vals, k, unlabeled, labeled, X, title=ala.get_name(), saveloc=args.saveloc)
-
-    if args.subplot:
-        plt.suptitle('Unnormalized Graph Laplacian Plots')
-        plt.savefig(args.saveloc + 'active-learning-2moons-u')
-        plt.show()
-    #os.system("say 'done with test'")
