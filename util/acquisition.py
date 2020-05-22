@@ -1,7 +1,7 @@
 # author: Kevin Miller
 import numpy as np
 from scipy.stats import norm
-
+from .al_util import hess_calc, hess_calc2, jac_calc, jac_calc2
 
 '''
 Graph Based SSL Models Considered:

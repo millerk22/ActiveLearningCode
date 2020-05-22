@@ -301,7 +301,7 @@ def probit_map_dr2(Z_, yvals, gamma, Ct):
 ################################################################################
 # Spectral truncation
 ################################################################################
-def probit_spectral_truncation(w, v, gamma, y, Z_ ):
+def probit_map_st(Z_, y,  gamma, w, v):
     N = v.shape[0]
     n = v.shape[1]
     def f(x):
