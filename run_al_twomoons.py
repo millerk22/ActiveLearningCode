@@ -59,18 +59,18 @@ if __name__ == "__main__":
 
     # Setup Dataset
     # 2 moons
-    N = 1000
-    X, labels = make_moons(N, noise=0.15, random_state=args.seed)
-    # X_full, labels = load_breast_cancer(return_X_y=True)
-    # pca = PCA(n_components=2)
-    # X = pca.fit_transform(X_full)
-    # N = labels.shape[0]
+    #N = 1000
+    #X, labels = make_moons(N, noise=0.15, random_state=args.seed)
+    X_full, labels = load_breast_cancer(return_X_y=True)
+    pca = PCA(n_components=2)
+    X = pca.fit_transform(X_full)
+    N = labels.shape[0]
     labels[np.where(labels == 0)] = -1
     ind_ord = list(np.where(labels == -1)[0]) + list(np.where(labels == 1)[0])
     ind_ordnp = np.array(ind_ord)
 
     # Choose labeled points
-    n_start = 10
+    n_start = 20
     np.random.seed(args.seed)
     labeled =  list(np.random.choice(np.where(labels == -1)[0],  size=n_start//2, replace=False))
     labeled += list(np.random.choice(np.where(labels ==  1)[0], size=n_start//2, replace=False))
@@ -97,10 +97,10 @@ if __name__ == "__main__":
     }
 
     gm = Graph_manager()
-    wn, vn = gm.from_features(X, graph_params, debug=True)
+    wn, vn = gm.from_features(X_full, graph_params, debug=True)
 
     graph_params['Ltype'] = 'unnormalized'
-    w, v = gm.from_features(X, graph_params, debug=True)
+    w, v = gm.from_features(X_full, graph_params, debug=True)
 
 
 
