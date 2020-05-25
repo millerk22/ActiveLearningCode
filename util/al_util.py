@@ -9,6 +9,50 @@ import matplotlib.pyplot as plt
 import copy
 import time
 
+class Classifier(object):
+    def __init__(self, name, gamma, tau, v=None, w=None, Ct=None):
+        self.gamma = gamma
+        self.tau = tau
+        self.v = v
+        self.w = w
+        if Ct: 
+            self.Ct = Ct
+        else:
+            self.d = (self.tau ** (2.)) * ((self.w + self.tau**2.) ** (-1.))
+            self.Ct = (self.v * self.d) @ self.v.T
+        self.name = name 
+        return
+
+    def get_m(self, Z, y):
+        if self.name == "probit":
+            return probit_map_dr(Z, y, self.gamma, self.Ct)
+        elif self.name == "probit-st":
+            return probit_map_st(Z, y, self.gamma, 1./self.d, self.v)
+        elif self.name == "probit2":
+            return probit_map_dr2(Z, y, self.gamma, self.Ct)
+        elif self.name == "probit2-st":
+            return probit_map_st2(Z, y, self.gamma, 1./self.d, self.v)
+        elif self.name == "gr":
+            return gr_map(Z, y, self.gamma, self.Ct)
+        else:
+            pass
+
+    def get_C(self, Z, y, m):
+        if self.name in ["probit", "probit-st"]:
+            if len(y) > len(self.w):
+                return Hess_inv_st(m, Z, y, 1./self.d, self.v, self.gamma)
+            else:
+                return Hess_inv(m, Z, y, self.gamma, self.Ct)
+        elif self.name in ["probit2", "probit2-st"]:
+            if len(y) > len(self.w):
+                return Hess_inv_st2(m, Z, y, 1./self.d, self.v, self.gamma)
+            else:
+                return Hess2_inv(m, Z, y, self.gamma, self.Ct)
+        elif self.name in ["gr"]:
+            return gr_C(Z, self.gamma, self.Ct)
+        else:
+            pass
+
 ###############################################################################
 ############### Gaussian Regression Helper Functions ##########################
 
@@ -306,24 +350,37 @@ def probit_map_dr2(Z_, yvals, gamma, Ct):
 ################################################################################
 # Spectral truncation
 ################################################################################
-def probit_map_st(Z_, y,  gamma, w, v):
+"""
+
+def pdf_deriv(t, gamma):
+    return -t*norm.pdf(t, scale = gamma)/(gamma**2)
+
+def jac_calc(uj_, yj_, gamma):
+    return -yj_*(norm.pdf(uj_*yj_, scale=gamma)/norm.cdf(uj_*yj_, scale=gamma))
+
+
+def hess_calc(uj_, yj_, gamma):
+    return (norm.pdf(uj_*yj_,scale=gamma)**2 - pdf_deriv(uj_*yj_, gamma)*norm.cdf(uj_*yj_,scale=gamma))/(norm.cdf(uj_*yj_,scale=gamma)**2)
+
+"""
+def probit_map_st(Z, y, gamma, w, v):
     N = v.shape[0]
     n = v.shape[1]
     def f(x):
         vec = np.zeros(N)
         tmp = v @ x
-        for i, yi in zip(Z_, y):
-            vec[i] = yi*norm.pdf(tmp[i]*yi, scale=gamma)/norm.cdf(tmp[i]*yi, scale=gamma)
+        for i, yi in zip(Z, y):
+            vec[i] = - jac_calc(tmp[i], yi, gamma)
+            #vec[i] = yi*norm.pdf(tmp[i]*yi, scale=gamma)/norm.cdf(tmp[i]*yi, scale=gamma)
         return w * x  - v.T @ vec
     def fprime(x):
         tmp = v @ x
         vec = np.zeros(N)
-        for i, yi in zip(Z_, y):
-            vec[i] = (pdf_deriv(tmp[i]*yi,gamma)*norm.cdf(tmp[i]*yi,scale=gamma)
-                         - norm.pdf(tmp[i]*yi,scale=gamma)**2)/ (norm.cdf(tmp[i]*yi,scale=gamma)**2)
-        H = -v.T @ sp.sparse.diags(vec, format='csr') @ v
-        if np.any(H == np.inf):
-            print('smally')
+        for i, yi in zip(Z, y):
+            vec[i] = -hess_calc(tmp[i], yi, gamma)
+            #vec[i] = (pdf_deriv(tmp[i]*yi,gamma)*norm.cdf(tmp[i]*yi,scale=gamma)
+            #             - norm.pdf(tmp[i]*yi,scale=gamma)**2)/ (norm.cdf(tmp[i]*yi,scale=gamma)**2)
+        H = (-v.T * vec) @ v
         H[np.diag_indices(n)] += w
         return H
     x0 = np.random.rand(len(w))
@@ -332,34 +389,79 @@ def probit_map_st(Z_, y,  gamma, w, v):
     return v @ res.x
 
 
-def Hess_inv_st(u, y, labeled, w, v, gamma, debug=False):
+def Hess_inv_st(u, Z, y, w, v, gamma, debug=False):
     """
     Assuming matrices are sparse, since L_tau should be relatively sparse,
         and we are perturbing with diagonal matrix.
     """
     H_d = np.zeros(u.shape[0])
-    for j, yj in zip(labeled, y):
+    for j, yj in zip(Z, y):
         H_d[j] = hess_calc(u[j], yj, gamma)
-    # if debug:
-    #     print(H_d[np.nonzero(H_d)])
-    # if np.any(H_d == np.inf):
-    #     print('smally')
     post = sp.sparse.diags(w, format='csr') \
            + v.T @ sp.sparse.diags(H_d, format='csr') @ v
     return v @ sp.linalg.inv(post) @ v.T
 
-def Hess_inv(u, y, labeled, gamma, Ct):
-    Ctp = Ct[np.ix_(labeled, labeled)]
+def probit_map_st2(Z, y,  gamma, w, v):
+    N = v.shape[0]
+    n = v.shape[1]
+    def f(x):
+        vec = np.zeros(N)
+        tmp = v @ x
+        for i, yi in zip(Z, y):
+            vec[i] = - jac_calc2(tmp[i], yi, gamma)
+            #vec[i] = yi*norm.pdf(tmp[i]*yi, scale=gamma)/norm.cdf(tmp[i]*yi, scale=gamma)
+        return w * x  - v.T @ vec
+    def fprime(x):
+        tmp = v @ x
+        vec = np.zeros(N)
+        for i, yi in zip(Z, y):
+            vec[i] = -hess_calc2(tmp[i], yi, gamma)
+            #vec[i] = (pdf_deriv(tmp[i]*yi,gamma)*norm.cdf(tmp[i]*yi,scale=gamma)
+            #             - norm.pdf(tmp[i]*yi,scale=gamma)**2)/ (norm.cdf(tmp[i]*yi,scale=gamma)**2)
+        H = (-v.T * vec) @ v
+        H[np.diag_indices(n)] += w
+        return H
+    x0 = np.random.rand(len(w))
+    res = root(f, x0, jac=fprime)
+    print(f"Root Finding is successful: {res.success}")
+    return v @ res.x
+
+def Hess_inv_st2(u, Z, y, w, v, gamma, debug=False):
+    """
+    Assuming matrices are sparse, since L_tau should be relatively sparse,
+        and we are perturbing with diagonal matrix.
+    """
+    H_d = np.zeros(u.shape[0])
+    for j, yj in zip(Z, y):
+        H_d[j] = hess_calc2(u[j], yj, gamma)
+    post = sp.sparse.diags(w, format='csr') \
+           + v.T @ sp.sparse.diags(H_d, format='csr') @ v
+    return v @ sp.linalg.inv(post) @ v.T
+
+def Hess_inv(u, Z, y, gamma, Ct):
+    Ctp = Ct[np.ix_(Z, Z)]
     H_d = np.zeros(y.shape[0])
-    for i, (j, yj) in enumerate(zip(labeled, y)):
+    for i, (j, yj) in enumerate(zip(Z, y)):
         H_d[i] = 1./hess_calc(u[j], yj, gamma)
     temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
-    return Ct - Ct[:, labeled] @ temp @ Ct[labeled, :]
+    return Ct - Ct[:, Z] @ temp @ Ct[Z, :]
 
-def Hess2_inv(u, y, labeled, gamma, Ct):
-    Ctp = Ct[np.ix_(labeled, labeled)]
+def Hess2_inv(u, Z, y, gamma, Ct):
+    Ctp = Ct[np.ix_(Z, Z)]
     H_d = np.zeros(y.shape[0])
-    for i, (j, yj) in enumerate(zip(labeled, y)):
+    for i, (j, yj) in enumerate(zip(Z, y)):
         H_d[i] = 1./hess_calc2(u[j], yj, gamma)
     temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
-    return Ct - Ct[:, labeled] @ temp @ Ct[labeled, :]
+    return Ct - Ct[:, Z] @ temp @ Ct[Z, :]
+
+def gr_C(Z, gamma, Ct):
+    Ctp = Ct[np.ix_(Z, Z)]
+    H_d = np.ones(Z.shape[0]) * (gamma * gamma)
+    temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
+    return Ct - Ct[:, Z] @ temp @ Ct[Z, :]
+
+def gr_map(Z, y, gamma, Ct):
+    C = gr_C(Z, gamma, Ct)
+    return (C[:,Z].dot(y))/(gamma * gamma)
+
+

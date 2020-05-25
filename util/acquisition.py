@@ -35,8 +35,29 @@ Graph Based SSL Models Considered:
                 m = argmin_u 1/2<u, Lu> - \sum_{j \in labeled} \log Psi_gamma(u_j y_j)  and
                 C^{-1} = L + \sum_{j \in labeled} F'(m_j, y_j) e_j e_j^T
 '''
-
-
+def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
+    if acquisition == "modelchange_p":
+        return modelchange_p(C, unlabeled, gamma, m, probit_norm=True)
+    elif acquisition == "modelchange_p2":
+        return  modelchange_p(C, unlabeled, gamma, m, probit_norm=False)
+    elif acquisition == "vopt_p":
+        return  vopt_p(C, unlabeled, gamma, m, probit_norm=True)
+    elif acquisition == "vopt_p2":
+        return vopt_p(C, unlabeled, gamma, m, probit_norm=False)
+    elif acquisition == "mbr_p":
+        return mbr_p(C, unlabeled, gamma, m, probit_norm=True)
+    elif acquisition == "mbr_p2":
+        return mbr_p(C, unlabeled, gamma, m, probit_norm=False)
+    elif acquisition == "vopt_gr":
+        return sopt_gr(C, unlabeled, gamma)
+    elif acquisition == "copt_gr":
+        return sopt_gr(C, unlabeled, gamma)
+    elif acquisition == "mbr_gr":
+        return mbr_gr(C, unlabeled, gamma, m, y)
+    elif acquisition == "modelchange_gr":
+        return modelchange_gr(C, unlabeled, gamma, m)
+    else:
+        pass
 
 ################ Harmonic Functions Active Learning Acquisition Functions ##########
 
