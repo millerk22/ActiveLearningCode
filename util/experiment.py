@@ -69,4 +69,4 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
             #C -= (1./(gamma2 + ckk)) * np.outer(ck,ck)
         acc_m = acc_classifier.get_m(labeled, labels[labeled])
         acc.append(get_acc(acc_m, labels)[1])
-    return acc
+    return acc, labeled
