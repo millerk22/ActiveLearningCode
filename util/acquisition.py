@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.stats import norm
 from util.al_util import *
+import time
 
 
 '''
@@ -147,7 +148,7 @@ def next_m_gr_old(m, C, y, lab, k, y_k, gamma2):
     return m_k
 
 
-def next_m_gr(m, C, y, lab, k, y_k, gamma2):
+def next_m_gr(m, C, k, y_k, gamma2):
     '''
     Calculate the "plus k, y_k" posterior mean update in the Gaussian Regression
     model.
@@ -173,7 +174,7 @@ def get_probs_gr(m, sigmoid=False):
     return m_probs
 
 
-def EE_gr(k, m, C, y, labeled, unlabeled, m_probs, gamma):
+def EE_gr(k, m, C, m_probs, gamma):
     '''
     Calculate the EE (expected error) in the Gaussian Regression model; that is,
     adapted the MBR criterion from Harmonic functions to fit the Gaussian Regression
@@ -181,10 +182,10 @@ def EE_gr(k, m, C, y, labeled, unlabeled, m_probs, gamma):
     '''
     N = C.shape[0]
     m_at_k = m_probs[k]
-    m_k_p1 = next_m_gr(m, C, y, labeled, k, 1., gamma**2.)
+    m_k_p1 = next_m_gr(m, C, k, 1., gamma**2.)
     m_k_p1 = get_probs_gr(m_k_p1)
     risk = m_at_k*np.sum([min(m_k_p1[i], 1.- m_k_p1[i]) for i in range(N)])
-    m_k_m1 = next_m_gr(m, C, y, labeled, k, -1., gamma**2.)
+    m_k_m1 = next_m_gr(m, C, k, -1., gamma**2.)
     m_k_m1 = get_probs_gr(m_k_m1)
     risk += (1.-m_at_k)*np.sum([min(m_k_m1[i], 1.- m_k_m1[i]) for i in range(N)])
     return risk
@@ -196,7 +197,7 @@ def mbr_gr(C, unlabeled, gamma, m, y):
     '''
     m_probs = get_probs_gr(m)
     labeled = list(filter(lambda i: i not in unlabeled, range(C.shape[0])))
-    risks = [EE_gr(j, m, C, y, labeled, unlabeled, m_probs, gamma**2) for j in unlabeled]
+    risks = [EE_gr(j, m, C, m_probs, gamma**2) for j in unlabeled]
     k_gbr = unlabeled[np.argmin(risks)]
     return k_gbr
 
@@ -271,12 +272,30 @@ def EE_p(k, m, C, gamma, probit_norm=False):
         jac_func = jac_calc2
         hess_func = hess_calc2
 
+
+
+
+    ck = C[k,:]
+    ckk = ck[k]
+    # Timing comparion in testing
+    # tic = time.clock()
+    # val = jac_func(m[k], 1., gamma)/(1. + ckk*hess_func(m[k], 1., gamma))
+    # toc = time.clock()
+    # print('NA probit val took %1.5f seconds' % (toc - tic))
+    #
+    # tic = time.clock()
+    # val = (1. - m[k])/(gamma**2. + ckk)
+    # toc = time.clock()
+    # print('GR val took %1.5f seconds' % (toc - tic))
+
+
+
     # Get Newton Approximation of plus k, +1 optimizer
-    m_k_p1 = m - jac_func(m[k], 1, gamma)/(1. + C[k,k]*hess_func(m[k], 1, gamma))*C[k,:]
+    m_k_p1 = m - jac_func(m[k], 1., gamma)/(1. + ckk*hess_func(m[k], 1., gamma))*ck
     risk = cdf_func(m[k], scale=gamma)*np.sum([cdf_func(-abs(m_k_p1[i]), scale=gamma) for i in range(m.shape[0])])
 
     # Get Newton Approximation of plus k, -1 optimizer
-    m_k_m1 = m - jac_func(m[k], -1, gamma)/(1. + C[k,k]*hess_func(m[k], -1, gamma ))*C[k,:]
+    m_k_m1 = m - jac_func(m[k], -1., gamma)/(1. + ckk*hess_func(m[k], -1., gamma ))*ck
     risk += cdf_func(-m[k], scale=gamma)*np.sum([cdf_func(-abs(m_k_m1[i]), scale=gamma) for i in range(m.shape[0])])
     return risk
 
@@ -284,6 +303,20 @@ def mbr_p(C, unlabeled, gamma, m, probit_norm=False):
     '''
     I think we can do MBR (EEM) in the Probit case, maybe this is useful?
     '''
+    # Timing comparison
+    # k = unlabeled[20]
+    # tic = time.clock()
+    # m_probs = get_probs_gr(m)
+    # eegr = EE_gr(k, m, C, m_probs, gamma**2.)
+    # toc = time.clock()
+    # print('EE_gr took %1.5f seconds' % (toc - tic))
+    #
+    # tic = time.clock()
+    # eegr = EE_p(k, m, C, gamma, probit_norm)
+    # toc = time.clock()
+    # print('EE_p took %1.5f seconds' % (toc - tic))
+
+
     mbr = [EE_p(k, m, C, gamma, probit_norm) for k in unlabeled]
     k_mbr = unlabeled[np.argmin(mbr)]
     return k_mbr

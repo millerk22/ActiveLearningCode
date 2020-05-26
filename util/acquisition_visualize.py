@@ -131,7 +131,7 @@ class ActiveLearningAcquisition(object):
         self.name = 'MBR-gr'
         m_probs = get_probs_gr(m)
         labeled = list(filter(lambda i: i not in unlabeled, range(C.shape[0])))
-        risks = [EE_gr(j, m, C, y, labeled, unlabeled, m_probs, gamma**2) for j in unlabeled]
+        risks = [EE_gr(j, m, C, m_probs, gamma**2) for j in unlabeled]
         k_gbr = unlabeled[np.argmin(risks)]
         return k_gbr, risks
 
@@ -191,7 +191,7 @@ class ActiveLearningAcquisition(object):
         k_mc = unlabeled[np.argmax(mc)]
         return k_mc, mc
 
-        
+
 
     def mbr_pv(self, C, unlabeled, gamma, m, probit_norm=False, **kwargs):
         '''
