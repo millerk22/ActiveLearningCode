@@ -10,10 +10,10 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
                    num_to_query = 10,
                    n_start  = 10, seed = 42,
                    exact_update = True,
-                   acc_classifier_name="probit", 
+                   acc_classifier_name="probit",
                    model_classifier_name = "probit",
                    acquisition="modelchange_p"):
-    
+
     """
     labels should be binary {-1, 1}
     Classifier:
@@ -21,7 +21,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
         probit:         probit without spectral truncation
         probit2-st:     probit with logistic likelihood with spectral truncation
                         (not implemented)
-        probit2:        probit with logistic likelihood without spectral        
+        probit2:        probit with logistic likelihood without spectral
                         truncation
     """
 
@@ -51,7 +51,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
     acc.append(get_acc(acc_m, labels)[1])
 
     for i in range(num_to_query):
-        #print("{}/{}".format(i+1, num_to_query))
+        print("{}/{}".format(i+1, num_to_query))
         # Calculate V-Opt criterion for unlabeled points
         unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
         k = get_k(C, unlabeled, gamma, acquisition, m = m, y = labels[labeled])
@@ -61,8 +61,8 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
             C = model_classifier.get_C(labeled, labels[labeled], m)
         else:
             a = labels[k]
-            m -= jac_calc2(m[k], a, gamma) / (1. + C[k,k] * hess_calc2(m[k], a, 
-                 gamma ))*C[k,:] 
+            m -= jac_calc2(m[k], a, gamma) / (1. + C[k,k] * hess_calc2(m[k], a,
+                 gamma ))*C[k,:]
             C = model_classifier.get_C(labeled, labels[labeled], m)
             #ck = C[k,:]
             #ckk = ck[k]

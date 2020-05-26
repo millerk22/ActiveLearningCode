@@ -49,8 +49,8 @@ def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
     elif acquisition == "mbr_p2":
         return mbr_p(C, unlabeled, gamma, m, probit_norm=False)
     elif acquisition == "vopt_gr":
-        return sopt_gr(C, unlabeled, gamma)
-    elif acquisition == "copt_gr":
+        return vopt_gr(C, unlabeled, gamma)
+    elif acquisition == "sopt_gr":
         return sopt_gr(C, unlabeled, gamma)
     elif acquisition == "mbr_gr":
         return mbr_gr(C, unlabeled, gamma, m, y)
@@ -126,7 +126,6 @@ def sopt_gr(C, unlabeled, gamma):
     Compute the Sigma-opt criterion adapted to the Gaussian Regression model
     '''
     sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1)
-    sums = np.asarray(sums).flatten()**2.
     s_opt = sums/(gamma**2. + np.diag(C)[unlabeled])
     k_max = unlabeled[np.argmax(s_opt)]
     return k_max
@@ -135,17 +134,29 @@ def sopt_gr(C, unlabeled, gamma):
 
 ''' Helper functions for EEM function in Gaussian Regression model'''
 
-def next_m_gr(m, C, y, lab, k, y_k, gamma2):
+def next_m_gr_old(m, C, y, lab, k, y_k, gamma2):
     '''
     Calculate the "plus k, y_k" posterior mean update in the Gaussian Regression
     model.
     '''
     ck = C[k,:]
     ckk = ck[k]
-    ip = np.dot(ck[lab], y[lab])
+    ip = np.dot(ck[lab], y) # this calculation is unstable with ck[lab] having entries close to 0
     val = ((gamma2)*y_k -ip )/(gamma2*(gamma2 + ckk))
     m_k = m + val*ck
     return m_k
+
+
+def next_m_gr(m, C, y, lab, k, y_k, gamma2):
+    '''
+    Calculate the "plus k, y_k" posterior mean update in the Gaussian Regression
+    model.
+
+    This is more numerically stable version of the above function
+    '''
+    ck = C[k,:]
+    ckk = ck[k]
+    return m + (y_k - m[k])*ck/(gamma2 + ckk)
 
 
 def get_probs_gr(m, sigmoid=False):

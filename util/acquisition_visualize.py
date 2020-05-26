@@ -118,58 +118,10 @@ class ActiveLearningAcquisition(object):
         '''
         self.name = 'Sigma opt-gr'
         sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1)
-        #sums = np.asarray(sums).flatten()**2.
-        #s_opt = sums/(gamma**2. + np.diag(C)[unlabeled])
         s_opt = (sums**2.)/(gamma**2. + np.diag(C)[unlabeled])
         k_max = unlabeled[np.argmax(s_opt)]
         return k_max, s_opt
 
-
-
-    # ''' Helper functions for EEM function in Gaussian Regression model'''
-    #
-    # def next_m_gr(m, C, y, lab, k, y_k, gamma2):
-    #     '''
-    #     Calculate the "plus k, y_k" posterior mean update in the Gaussian Regression
-    #     model.
-    #     '''
-    #     ck = C[k,:]
-    #     ckk = ck[k]
-    #     ip = np.dot(ck[lab], y[lab])
-    #     val = ((gamma2)*y_k -ip )/(gamma2*(gamma2 + ckk))
-    #     m_k = m + val*ck
-    #     return m_k
-    #
-    #
-    # def get_probs_gr(m, sigmoid=False):
-    #     '''
-    #     Convert the Gaussian Regression mean vector into probabilities for use in EEM.
-    #     '''
-    #     if sigmoid:
-    #         return 1./(1. + np.exp(-3.*m))
-    #     m_probs = m.copy()
-    #     # simple fix to get probabilities that respect the 0 threshold
-    #     m_probs[np.where(m_probs > 0)] /= 2.*np.max(m_probs)
-    #     m_probs[np.where(m_probs < 0)] /= -2.*np.min(m_probs)
-    #     m_probs += 0.5
-    #     return m_probs
-    #
-    #
-    # def EE_gr(k, m, C, y, labeled, unlabeled, m_probs, gamma):
-    #     '''
-    #     Calculate the EE (expected error) in the Gaussian Regression model; that is,
-    #     adapted the MBR criterion from Harmonic functions to fit the Gaussian Regression
-    #     model (in which we have +1, -1 labels, and soft labelings).
-    #     '''
-    #     N = C.shape[0]
-    #     m_at_k = m_probs[k]
-    #     m_k_p1 = next_m_gr(m, C, y, labeled, k, 1., gamma**2.)
-    #     m_k_p1 = get_probs_gr(m_k_p1)
-    #     risk = m_at_k*np.sum([min(m_k_p1[i], 1.- m_k_p1[i]) for i in range(N)])
-    #     m_k_m1 = next_m_gr(m, C, y, labeled, k, -1., gamma**2.)
-    #     m_k_m1 = get_probs_gr(m_k_m1)
-    #     risk += (1.-m_at_k)*np.sum([min(m_k_m1[i], 1.- m_k_m1[i]) for i in range(N)])
-    #     return risk
 
 
     def mbr_grv(self, C, unlabeled, gamma, m, y, **kwargs):
@@ -239,36 +191,7 @@ class ActiveLearningAcquisition(object):
         k_mc = unlabeled[np.argmax(mc)]
         return k_mc, mc
 
-
-
-    # # Helper functions for MBR probit adaptation
-    # def logistic_cdf(t, scale):
-    #     return 1.0/(1.0 + np.exp(-t/scale))
-    #
-    #
-    # def EE_p(k, m, C, gamma, probit_norm=False):
-    #     '''
-    #     Calculate the EE (expected error) in the Gaussian Regression model; that is,
-    #     adapted the MBR criterion from Harmonic functions to fit the Gaussian Regression
-    #     model (in which we have +1, -1 labels, and soft labelings).
-    #     '''
-    #     if probit_norm:
-    #         cdf_func = norm.cdf
-    #         jac_func = jac_calc
-    #         hess_func = hess_calc
-    #     else:
-    #         cdf_func = logistic_cdf
-    #         jac_func = jac_calc2
-    #         hess_func = hess_calc2
-    #
-    #     # Get Newton Approximation of plus k, +1 optimizer
-    #     m_k_p1 = m - jac_func(m[k], 1, gamma)/(1. + C[k,k]*hess_func(m[k], 1, gamma))*C[k,:]
-    #     risk = cdf_func(m[k], scale=gamma)*np.sum([cdf_func(-abs(m_k_p1[i]), scale=gamma) for i in range(m.shape[0])])
-    #
-    #     # Get Newton Approximation of plus k, -1 optimizer
-    #     m_k_m1 = m - jac_func(m[k], -1, gamma)/(1. + C[k,k]*hess_func(m[k], -1, gamma ))*C[k,:]
-    #     risk += cdf_func(-m[k], scale=gamma)*np.sum([cdf_func(-abs(m_k_m1[i]), scale=gamma) for i in range(m.shape[0])])
-    #     return risk
+        
 
     def mbr_pv(self, C, unlabeled, gamma, m, probit_norm=False, **kwargs):
         '''
