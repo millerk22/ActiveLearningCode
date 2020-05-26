@@ -9,4 +9,5 @@ util/__pycache__/*
 f_plot*.py
 util/al_util_clean.py
 datasets/__pycache__/
+*_old.py
 
