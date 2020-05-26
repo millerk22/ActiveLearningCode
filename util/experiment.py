@@ -33,7 +33,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
     #Ct = v @ sp.sparse.diags(d, format='csr') @ v.T
     #Ct_inv = v @ sp.sparse.diags(1./d, format='csr') @ v.T
     acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
-    model_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
+    model_classifier = Classifier(model_classifier_name, gamma, tau, v=v, w=w)
     np.random.seed(seed)
     labeled_orig =  list(np.random.choice(np.where(labels == -1)[0],
                         size=n_start//2, replace=False))

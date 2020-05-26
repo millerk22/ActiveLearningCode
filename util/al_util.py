@@ -440,7 +440,7 @@ def Hess_inv_st2(u, Z, y, w, v, gamma, debug=False):
 
 def Hess_inv(u, Z, y, gamma, Ct):
     Ctp = Ct[np.ix_(Z, Z)]
-    H_d = np.zeros(y.shape[0])
+    H_d = np.zeros(len(y))
     for i, (j, yj) in enumerate(zip(Z, y)):
         H_d[i] = 1./hess_calc(u[j], yj, gamma)
     temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
@@ -448,7 +448,7 @@ def Hess_inv(u, Z, y, gamma, Ct):
 
 def Hess2_inv(u, Z, y, gamma, Ct):
     Ctp = Ct[np.ix_(Z, Z)]
-    H_d = np.zeros(y.shape[0])
+    H_d = np.zeros(len(y))
     for i, (j, yj) in enumerate(zip(Z, y)):
         H_d[i] = 1./hess_calc2(u[j], yj, gamma)
     temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
@@ -456,7 +456,7 @@ def Hess2_inv(u, Z, y, gamma, Ct):
 
 def gr_C(Z, gamma, Ct):
     Ctp = Ct[np.ix_(Z, Z)]
-    H_d = np.ones(Z.shape[0]) * (gamma * gamma)
+    H_d = np.ones(len(Z)) * (gamma * gamma)
     temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
     return Ct - Ct[:, Z] @ temp @ Ct[Z, :]
 
