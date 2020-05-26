@@ -25,13 +25,15 @@ class Classifier(object):
 
     def get_m(self, Z, y):
         if self.name == "probit":
-            return probit_map_dr(Z, y, self.gamma, self.Ct)
-        elif self.name == "probit-st":
-            return probit_map_st(Z, y, self.gamma, 1./self.d, self.v)
+            if len(y) <= len(self.w):
+                return probit_map_dr(Z, y, self.gamma, self.Ct)
+            else:
+                return probit_map_st(Z, y, self.gamma, 1./self.d, self.v)
         elif self.name == "probit2":
-            return probit_map_dr2(Z, y, self.gamma, self.Ct)
-        elif self.name == "probit2-st":
-            return probit_map_st2(Z, y, self.gamma, 1./self.d, self.v)
+            if len(y) <= len(self.w):
+                return probit_map_dr2(Z, y, self.gamma, self.Ct)
+            else:
+                return probit_map_st2(Z, y, self.gamma, 1./self.d, self.v)
         elif self.name == "gr":
             return gr_map(Z, y, self.gamma, self.Ct)
         else:
@@ -385,7 +387,7 @@ def probit_map_st(Z, y, gamma, w, v):
         return H
     x0 = np.random.rand(len(w))
     res = root(f, x0, jac=fprime)
-    print(f"Root Finding is successful: {res.success}")
+    #print(f"Root Finding is successful: {res.success}")
     return v @ res.x
 
 
@@ -423,7 +425,7 @@ def probit_map_st2(Z, y,  gamma, w, v):
         return H
     x0 = np.random.rand(len(w))
     res = root(f, x0, jac=fprime)
-    print(f"Root Finding is successful: {res.success}")
+    #print(f"Root Finding is successful: {res.success}")
     return v @ res.x
 
 def Hess_inv_st2(u, Z, y, w, v, gamma, debug=False):
