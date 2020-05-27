@@ -57,6 +57,8 @@ def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
         return mbr_gr(C, unlabeled, gamma, m, y)
     elif acquisition == "modelchange_gr":
         return modelchange_gr(C, unlabeled, gamma, m)
+    elif acquisition == "random":
+        return np.random.choice(unlabeled, 1)[0]
     else:
         pass
 

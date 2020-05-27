@@ -46,16 +46,17 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
 
     C = copy.deepcopy(C_orig)    # get the original data, before AL choices
     labeled = copy.deepcopy(labeled_orig)
-
+    
+    unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
     acc = []
-    acc.append(get_acc(acc_m, labels)[1])
+    acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
 
     for i in range(num_to_query):
-        print("{}/{}".format(i+1, num_to_query))
+        # print("{}/{}".format(i+1, num_to_query))
         # Calculate V-Opt criterion for unlabeled points
-        unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
         k = get_k(C, unlabeled, gamma, acquisition, m = m, y = labels[labeled])
         labeled += [k]
+        unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
         if exact_update == True:
             m = model_classifier.get_m(labeled, labels[labeled])
             C = model_classifier.get_C(labeled, labels[labeled], m)
@@ -68,5 +69,5 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
             #ckk = ck[k]
             #C -= (1./(gamma2 + ckk)) * np.outer(ck,ck)
         acc_m = acc_classifier.get_m(labeled, labels[labeled])
-        acc.append(get_acc(acc_m, labels)[1])
+        acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
     return acc, labeled

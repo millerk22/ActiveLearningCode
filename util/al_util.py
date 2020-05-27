@@ -191,11 +191,15 @@ def plot_iter(m, X, labels, labeled, k_next=-1, title=None, subplot=False):
     return
 
 
-def get_acc(u, labels):
+def get_acc(u, labels, unlabeled = None):
     u_ = np.sign(u)
     u_[u_ == 0] = 1
-    corr = sum(1.*(u_ == labels))
-    return corr, corr/u.shape[0]
+    if unlabeled is None:
+        corr = sum(1.*(u_ == labels))
+        return corr, corr/u.shape[0]
+    else:
+        corr = sum(1.*(u_[unlabeled] == labels[unlabeled]))
+        return corr, corr/len(unlabeled)
 
 
 
