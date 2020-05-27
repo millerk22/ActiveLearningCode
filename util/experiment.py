@@ -51,8 +51,10 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
     acc = []
     acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
 
+    num_batch = num_to_query // 4
     for i in range(num_to_query):
-        # print("{}/{}".format(i+1, num_to_query))
+        if (i+1) % num_batch == 0:
+            print("{}/{}".format(i+1, num_to_query))
         # Calculate V-Opt criterion for unlabeled points
         k = get_k(C, unlabeled, gamma, acquisition, m = m, y = labels[labeled])
         labeled += [k]
