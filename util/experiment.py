@@ -5,6 +5,7 @@ import numpy as np
 import copy
 from .al_util import *
 from .acquisition import *
+import time
 
 def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
                    num_to_query = 10,
@@ -28,7 +29,6 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
     if n_eig:
         w = w[:n_eig]
         v = v[:, :n_eig]
-
     #d = (tau ** (2.)) * ((w + tau**2.) ** (-1.))
     #Ct = v @ sp.sparse.diags(d, format='csr') @ v.T
     #Ct_inv = v @ sp.sparse.diags(1./d, format='csr') @ v.T
@@ -58,6 +58,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
         unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
         k = get_k(C, unlabeled, gamma, acquisition, m = m, y = labels[labeled])
         labeled += [k]
+
         if exact_update == True:
             m = model_classifier.get_m(labeled, labels[labeled])
             C = model_classifier.get_C(labeled, labels[labeled], m)
@@ -65,10 +66,9 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
             a = labels[k]
             m -= jac_calc2(m[k], a, gamma) / (1. + C[k,k] * hess_calc2(m[k], a,
                  gamma ))*C[k,:]
-            C = model_classifier.get_C(labeled, labels[labeled], m)
-            #ck = C[k,:]
-            #ckk = ck[k]
-            #C -= (1./(gamma2 + ckk)) * np.outer(ck,ck)
+            C = C - hess_calc2(m[k], a, gamma)/(1. + C[k,k]*hess_calc2(m[k], a, gamma))*np.outer(C[k,:], C[k,:])
+
         acc_m = acc_classifier.get_m(labeled, labels[labeled])
-        acc.append(get_acc(acc_m, labels)[1])
+        acc.append(get_acc(acc_m[unlabeled], labels[unlabeled])[1])
+    
     return acc, labeled

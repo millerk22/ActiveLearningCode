@@ -57,6 +57,10 @@ def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
         return mbr_gr(C, unlabeled, gamma, m, y)
     elif acquisition == "modelchange_gr":
         return modelchange_gr(C, unlabeled, gamma, m)
+    elif acquisition == "vopt_new_p":
+        return vopt_p_new(C, unlabeled, gamma, m, probit_norm=True)
+    elif acquisition == "vopt_new_p2":
+        return vopt_p_new(C, unlabeled, gamma, m, probit_norm=False)
     else:
         pass
 
@@ -190,6 +194,21 @@ def EE_gr(k, m, C, m_probs, gamma):
     risk += (1.-m_at_k)*np.sum([min(m_k_m1[i], 1.- m_k_m1[i]) for i in range(N)])
     return risk
 
+def EE_gr_old(k, m, C, m_probs, labeled, y, gamma):
+    '''
+    Calculate the EE (expected error) in the Gaussian Regression model; that is,
+    adapted the MBR criterion from Harmonic functions to fit the Gaussian Regression
+    model (in which we have +1, -1 labels, and soft labelings).
+    '''
+    N = C.shape[0]
+    m_at_k = m_probs[k]
+    m_k_p1 = next_m_gr_old(m, C, labeled, y, k, 1., gamma**2.)
+    m_k_p1 = get_probs_gr(m_k_p1)
+    risk = m_at_k*np.sum([min(m_k_p1[i], 1.- m_k_p1[i]) for i in range(N)])
+    m_k_m1 = next_m_gr_old(m, C, labeled, y, k, -1., gamma**2.)
+    m_k_m1 = get_probs_gr(m_k_m1)
+    risk += (1.-m_at_k)*np.sum([min(m_k_m1[i], 1.- m_k_m1[i]) for i in range(N)])
+    return risk
 
 def mbr_gr(C, unlabeled, gamma, m, y):
     '''
@@ -197,7 +216,7 @@ def mbr_gr(C, unlabeled, gamma, m, y):
     '''
     m_probs = get_probs_gr(m)
     labeled = list(filter(lambda i: i not in unlabeled, range(C.shape[0])))
-    risks = [EE_gr(j, m, C, m_probs, gamma**2) for j in unlabeled]
+    risks = [EE_gr_old(j, m, C, m_probs, labeled, y, gamma) for j in unlabeled]
     k_gbr = unlabeled[np.argmin(risks)]
     return k_gbr
 
@@ -231,6 +250,31 @@ def vopt_p(C, unlabeled, gamma, m, dumb=False, probit_norm=False):
         else:
             # take the "best case" labeling -- MAYBE do weighted average?
             v_opt = ips * np.array([hess_calc2(m[k], np.sign(m[k]), gamma)/(hess_calc2(m[k], np.sign(m[k]), gamma)*C[k,k] + 1.) for k in unlabeled])
+    k_max = unlabeled[np.argmax(v_opt)]
+    return k_max
+
+
+def vopt_p_new(C, unlabeled, gamma, m, dumb=False, probit_norm=False):
+    '''
+    Compute V-opt criterion adapted to the Probit model (i.e. the Gaussian Approximation
+    of the Probit posterior).
+
+    This differs from vopt_p in that we use the NA for the k^th entries to plug into the posterior covariance calculation of columns,
+    whereas vopt_p is using the previous MAP estimator's corresponding values. Empirically, doesn't seem to change the overall
+    performance, though different AL choices are made.
+    '''
+    ips = np.array([np.inner(C[k,:], C[k,:]) for k in unlabeled]).flatten()
+    if dumb:
+        v_opt = ips/(gamma**2. + np.diag(C)[unlabeled])
+    else:
+        if probit_norm:
+            mNA = m - np.array([jac_calc(m[i], np.sign(m[i]), gamma)*C[i,i]/(1. + C[i,i]*hess_calc(m[i],np.sign(m[i]), gamma)) for i in range(m.shape[0])])
+            # take the "best case" labeling -- MAYBE do weighted average?
+            v_opt = ips * np.array([hess_calc(mNA[k], np.sign(mNA[k]), gamma)/(hess_calc(mNA[k], np.sign(mNA[k]), gamma)*C[k,k] + 1.) for k in unlabeled])
+        else:
+            # take the "best case" labeling -- MAYBE do weighted average?
+            mNA = m - np.array([jac_calc2(m[i], np.sign(m[i]), gamma)*C[i,i]/(1. + C[i,i]*hess_calc2(m[i],np.sign(m[i]), gamma)) for i in range(m.shape[0])])
+            v_opt = ips * np.array([hess_calc2(mNA[k], np.sign(mNA[k]), gamma)/(hess_calc2(mNA[k], np.sign(mNA[k]), gamma)*C[k,k] + 1.) for k in unlabeled])
     k_max = unlabeled[np.argmax(v_opt)]
     return k_max
 
