@@ -61,6 +61,8 @@ def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
         return vopt_p_new(C, unlabeled, gamma, m, probit_norm=True)
     elif acquisition == "vopt_new_p2":
         return vopt_p_new(C, unlabeled, gamma, m, probit_norm=False)
+    elif acquisition == "random":
+        return np.random.choice(unlabeled, 1)[0]
     else:
         pass
 

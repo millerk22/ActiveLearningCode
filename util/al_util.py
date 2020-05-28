@@ -15,12 +15,12 @@ class Classifier(object):
         self.tau = tau
         self.v = v
         self.w = w
-        if Ct: 
+        if Ct:
             self.Ct = Ct
         else:
             self.d = (self.tau ** (2.)) * ((self.w + self.tau**2.) ** (-1.))
             self.Ct = (self.v * self.d) @ self.v.T
-        self.name = name 
+        self.name = name
         return
 
     def get_m(self, Z, y):
@@ -191,11 +191,15 @@ def plot_iter(m, X, labels, labeled, k_next=-1, title=None, subplot=False):
     return
 
 
-def get_acc(u, labels):
+def get_acc(u, labels, unlabeled = None):
     u_ = np.sign(u)
     u_[u_ == 0] = 1
-    corr = sum(1.*(u_ == labels))
-    return corr, corr/u.shape[0]
+    if unlabeled is None:
+        corr = sum(1.*(u_ == labels))
+        return corr, corr/u.shape[0]
+    else:
+        corr = sum(1.*(u_[unlabeled] == labels[unlabeled]))
+        return corr, corr/len(unlabeled)
 
 
 
@@ -465,5 +469,3 @@ def gr_C(Z, gamma, Ct):
 def gr_map(Z, y, gamma, Ct):
     C = gr_C(Z, gamma, Ct)
     return (C[:,Z].dot(y))/(gamma * gamma)
-
-
