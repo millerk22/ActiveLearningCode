@@ -55,6 +55,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
     acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
 
     num_batch = num_to_query // 4
+
     for i in range(num_to_query):
         if (i+1) % num_batch == 0:
             print("\t{}/{}".format(i+1, num_to_query))
@@ -63,6 +64,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
         k = get_k(C, unlabeled, acquisition, gamma=gamma, m = m) # we don't need y for any acquisition function now
         labeled += [k]
         unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
+
         if exact_update == True:
             m = model_classifier.get_m(labeled, labels[labeled])
             C = model_classifier.get_C(labeled, labels[labeled], m)
@@ -200,7 +202,7 @@ def test(w, v, labels, gamma, tau, n_eig,
                         n_start  = n_start, seed = seed,
                         exact_update = False,
                         acc_classifier_name="probit2", model_classifier_name="probit",
-                        acquisition=acq[-2:])
+                        acquisition=acq[:-2])
         elif acq in ("modelchange_p2NA", "vopt_p2NA"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
@@ -208,10 +210,10 @@ def test(w, v, labels, gamma, tau, n_eig,
                         n_start  = n_start, seed = seed,
                         exact_update = False,
                         acc_classifier_name="probit2", model_classifier_name="probit2",
-                        acquisition=acq[-2:])
+                        acquisition=acq[:-2])
 
-    np.savez(filename + "acc.npz", **acc)
-    np.savez(filename + "labeled.npz", **labeled)
+        np.savez(filename + "acc.npz", **acc)
+        np.savez(filename + "labeled.npz", **labeled)
 
 
 
@@ -250,6 +252,6 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
                         n_start  = n_start, seed = seed,
                         acc_classifier_name="probit2", acquisition=acq)
 
-    np.savez(filename + "acc_hf.npz", **acc)
-    np.savez(filename + "labeled_hf.npz", **labeled)
+        np.savez(filename + "acc_hf.npz", **acc)
+        np.savez(filename + "labeled_hf.npz", **labeled)
     return acc, labeled
