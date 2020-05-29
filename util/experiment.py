@@ -37,6 +37,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
     acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
     model_classifier = Classifier(model_classifier_name, gamma, tau, v=v, w=w)
     np.random.seed(seed)
+
     labeled_orig =  list(np.random.choice(np.where(labels == -1)[0],
                         size=n_start//2, replace=False))
     labeled_orig += list(np.random.choice(np.where(labels ==  1)[0],
@@ -77,7 +78,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
 
 
 
-def run_experiment_hf(w, v, L, labels, tau =0.1, gamma=0.1, num_to_query = 10,
+def run_experiment_hf(w, v, L_un, labels, tau =0.1, gamma=0.1, num_to_query = 10,
                    n_start  = 10, seed = 42, acc_classifier_name = "probit2",
                    acquisition="modelchange_hf"):
 
@@ -94,7 +95,7 @@ def run_experiment_hf(w, v, L, labels, tau =0.1, gamma=0.1, num_to_query = 10,
 
 
     acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
-    model_classifier = Classifier_HF(tau, L)
+    model_classifier = Classifier_HF(tau, L_un)
     np.random.seed(seed)
     labeled =  list(np.random.choice(np.where(labels == -1)[0],
                         size=n_start//2, replace=False))
@@ -144,13 +145,13 @@ def run_experiment_hf(w, v, L, labels, tau =0.1, gamma=0.1, num_to_query = 10,
     return acc, labeled
 
 
-    
+
 
 def test(w, v, labels, gamma, tau, n_eig,
          num_to_query, n_start, seed, filename, acqs):
     print(filename)
     if not os.path.exists(filename):
-        os.mkdir(filename)
+        os.makedirs(filename)
     try:
         acc = dict(np.load(filename + "acc.npz"))
         labeled = dict(np.load(filename + "labeled.npz"))
@@ -158,51 +159,97 @@ def test(w, v, labels, gamma, tau, n_eig,
         acc = {}
         labeled = {}
 
-    for acqs in acqs:
-        print(acqs)
-        if acqs in acc and acqs in labeled:
-            print("Found exiting results")
+
+    # IDEA: Save parameters in dictionary in this directory? Check the parameters before the test, in
+    # case of running different acquisition functions, with different parameters than the rest
+    # of the tests in the current directory?
+
+    for acq in acqs:
+        print(acq)
+        if acq in acc and acq in labeled:
+            print("Found existing results")
             continue
-        if acqs in ("modelchange_gr", "vopt_gr", "mbr_gr"):
-            acc[acqs], labeled[acqs] = run_experiment(w, v, labels,
+        if acq in ("modelchange_gr", "vopt_gr", "mbr_gr", "sopt_gr"):
+            acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma,
                         n_eig = n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = True,
-                        acc_classifier_name="probit2", model_classifier_name="gr", acquisition=acqs)
-        elif acqs in ("modelchange_p2", "vopt_p2", "mbr_p2", "vopt_new_p2"):
-            acc[acqs], labeled[acqs] = run_experiment(w, v, labels,
+                        acc_classifier_name="probit2", model_classifier_name="gr", acquisition=acq)
+        elif acq in ("modelchange_p2", "vopt_p2", "mbr_p2", "vopt_new_p2"):
+            acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = True,
                         acc_classifier_name="probit2", model_classifier_name="probit2",
-                        acquisition=acqs)
-        elif acqs in ("modelchange_p", "vopt_p", "mbr_p", "vopt_new_p"):
-            acc[acqs], labeled[acqs] = run_experiment(w, v, labels,
+                        acquisition=acq)
+        elif acq in ("modelchange_p", "vopt_p", "mbr_p", "vopt_new_p"):
+            acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = True,
                         acc_classifier_name="probit2", model_classifier_name="probit",
-                        acquisition=acqs)
-        elif acqs in ("modelchange_pNA", "vopt_pNA"):
-            acc[acqs], labeled[acqs] = run_experiment(w, v, labels,
+                        acquisition=acq)
+        elif acq in ("modelchange_pNA", "vopt_pNA"):
+            acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = False,
                         acc_classifier_name="probit2", model_classifier_name="probit",
-                        acquisition=acqs)
-        elif acqs in ("modelchange_p2NA", "vopt_p2NA"):
-            acc[acqs], labeled[acqs] = run_experiment(w, v, labels,
+                        acquisition=acq[-2:])
+        elif acq in ("modelchange_p2NA", "vopt_p2NA"):
+            acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = False,
                         acc_classifier_name="probit2", model_classifier_name="probit2",
-                        acquisition=acqs)
-        np.savez(filename + "acc.npz", **acc)
-        np.savez(filename + "labeled.npz", **labeled)
+                        acquisition=acq[-2:])
+
+    np.savez(filename + "acc.npz", **acc)
+    np.savez(filename + "labeled.npz", **labeled)
+
+
+
+    return acc, labeled
+
+
+
+def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filename, acqs):
+    '''
+        IDEA: Should merge this function into test function above... But worried about messing up previous
+        code with the addition of unnormalized graph Laplacian L_un
+
+        L_un is the unnormalized graph Laplacian, for use in the HF model.
+    '''
+    print(filename)
+    if not os.path.exists(filename):
+        os.mkdir(filename)
+    try:
+        print("Found data from other test function (i.e. GR or Probit models), adding the results of  \
+        these harmonic function test to the .npz files found")
+        acc = dict(np.load(filename + "acc.npz"))
+        labeled = dict(np.load(filename + "labeled.npz"))
+    except:
+        acc = {}
+        labeled = {}
+
+    for acq in [a for a in acqs if a[-2:] == "hf"]:
+        print(acq)
+        if acq in acc and acq in labeled:
+            print("Found existing results")
+            continue
+        if acq in ("vopt_hf", "sopt_hf", "mbr_hf"):
+            acc[acq], labeled[acq] = run_experiment_hf(w, v, L_un, labels,
+                        tau = tau, gamma = gamma,
+                        num_to_query = num_to_query,
+                        n_start  = n_start, seed = seed,
+                        acc_classifier_name="probit2", acquisition=acq)
+
+    np.savez(filename + "acc_hf.npz", **acc)
+    np.savez(filename + "labeled_hf.npz", **labeled)
     return acc, labeled

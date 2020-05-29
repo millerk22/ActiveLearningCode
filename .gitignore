@@ -11,6 +11,5 @@ util/al_util_clean.py
 datasets/__pycache__/
 *_old.py
 __pycache__/
-util/plot_util.py
 plotting_script.py
 

@@ -75,7 +75,7 @@ class Classifier_HF(object):
         if Zbar is None:
             Zbar = list(filter(lambda x: x not in Z, range(self.L.shape[0])))
         if self.sparse:
-            return scipy.sparse.linalg.inv(self.L[np.ix_(Zbar, Zbar)]).toarray()
+            return scipy.sparse.linalg.inv(self.L[np.ix_(Zbar, Zbar)]).toarray() # inverse will be dense anyway
         else:
             return sla.inv(self.L[np.ix_(Zbar, Zbar)])
 

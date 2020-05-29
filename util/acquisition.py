@@ -63,8 +63,8 @@ def get_k(C, unlabeled, acquisition, gamma=0.1, m = None, y=None):
         return vopt_p_new(C, unlabeled, gamma, m, probit_norm=False)
     elif acquisition == "random":
         return np.random.choice(unlabeled, 1)[0]
-    elif acquisition == "vopt_hf":
-        return vopt_hf(C)
+    elif acquisition == "vopt_hf": # Note Harmonic Function acquisitions return in the index in the unlabeled subset,
+        return vopt_hf(C)           # NOT in the full index set of total nodes
     elif acquisition == "sopt_hf":
         return sopt_hf(C)
     elif acquisition == "mbr_hf":
