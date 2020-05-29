@@ -36,7 +36,7 @@ Graph Based SSL Models Considered:
                 m = argmin_u 1/2<u, Lu> - \sum_{j \in labeled} \log Psi_gamma(u_j y_j)  and
                 C^{-1} = L + \sum_{j \in labeled} F'(m_j, y_j) e_j e_j^T
 '''
-def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
+def get_k(C, unlabeled, acquisition, gamma=0.1, m = None, y=None):
     if acquisition == "modelchange_p":
         return modelchange_p(C, unlabeled, gamma, m, probit_norm=True)
     elif acquisition == "modelchange_p2":
@@ -54,7 +54,7 @@ def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
     elif acquisition == "sopt_gr":
         return sopt_gr(C, unlabeled, gamma)
     elif acquisition == "mbr_gr":
-        return mbr_gr(C, unlabeled, gamma, m, y)
+        return mbr_gr(C, unlabeled, gamma, m)
     elif acquisition == "modelchange_gr":
         return modelchange_gr(C, unlabeled, gamma, m)
     elif acquisition == "vopt_new_p":
@@ -63,12 +63,18 @@ def get_k(C, unlabeled, gamma, acquisition, m = None, y=None):
         return vopt_p_new(C, unlabeled, gamma, m, probit_norm=False)
     elif acquisition == "random":
         return np.random.choice(unlabeled, 1)[0]
+    elif acquisition == "vopt_hf":
+        return vopt_hf(C)
+    elif acquisition == "sopt_hf":
+        return sopt_hf(C)
+    elif acquisition == "mbr_hf":
+        return mbr_hf(C, m)
     else:
         pass
 
 ################ Harmonic Functions Active Learning Acquisition Functions ##########
 
-def vopt_hf(C, **kwargs):
+def vopt_hf(C):
     '''
     Compute the original V-opt criterion under the Harmonic Functions model.
         ** NOTE : this returns the index IN the submatrix that C is, not in the
@@ -78,7 +84,7 @@ def vopt_hf(C, **kwargs):
     k_max = np.argmax(v_opt)
     return k_max
 
-def sopt_hf(C, **kwargs):
+def sopt_hf(C):
     '''
     Compute the original Sigma-opt criterion under the Harmonic Functions model.
         ** NOTE : this returns the index IN the submatrix that C is, not in the
@@ -96,7 +102,7 @@ def EE_hf(k, m, ck):
     risk += np.sum([min(mk_1[i], 1. - mk_1[i]) for i in range(m.shape[0])])
     return risk
 
-def mbr_hf(C, m, **kwargs):
+def mbr_hf(C, m):
     '''
     Compute the original MBR (AKA EEM) criterion under the Harmonic Functions model.
         ** NOTE : NEED 0-1 LABELING FOR THIS CRITERION.
@@ -212,13 +218,13 @@ def EE_gr_old(k, m, C, m_probs, labeled, y, gamma):
     risk += (1.-m_at_k)*np.sum([min(m_k_m1[i], 1.- m_k_m1[i]) for i in range(N)])
     return risk
 
-def mbr_gr(C, unlabeled, gamma, m, y):
+def mbr_gr(C, unlabeled, gamma, m):
     '''
     Compute the MBR acquisition choice, adapted to the Gaussian Regression model.
     '''
     m_probs = get_probs_gr(m)
     labeled = list(filter(lambda i: i not in unlabeled, range(C.shape[0])))
-    risks = [EE_gr_old(j, m, C, m_probs, labeled, y, gamma) for j in unlabeled]
+    risks = [EE_gr(j, m, C, m_probs, gamma) for j in unlabeled]
     k_gbr = unlabeled[np.argmin(risks)]
     return k_gbr
 

@@ -55,6 +55,30 @@ class Classifier(object):
         else:
             pass
 
+
+class Classifier_HF(object):
+    def __init__(self, tau, L):
+        self.tau = tau
+        if sps.issparse(L):
+            self.sparse = True
+            self.L = L + self.tau**2. * sps.eye(L.shape[0])
+        else:
+            self.sparse = False
+            self.L = L + self.tau**2. * np.eye(L.shape[0])
+        return
+
+    def get_m(self, Z, y):
+        Zbar = list(filter(lambda x: x not in Z, range(self.L.shape[0])))
+        return -self.get_C(Z, Zbar=Zbar) @ self.L[np.ix_(Zbar, Z)] @ y
+
+    def get_C(self, Z, Zbar=None):
+        if Zbar is None:
+            Zbar = list(filter(lambda x: x not in Z, range(self.L.shape[0])))
+        if self.sparse:
+            return scipy.sparse.linalg.inv(self.L[np.ix_(Zbar, Zbar)]).toarray()
+        else:
+            return sla.inv(self.L[np.ix_(Zbar, Zbar)])
+
 ###############################################################################
 ############### Gaussian Regression Helper Functions ##########################
 
