@@ -33,7 +33,7 @@ latex_name ={"modelchange_p2":"Probit MC",
          "sopt_hf":"HF SOpt"}
 
 MARKERS = ['o','*', 'v', '^', '<', '>', '8', 's', 'p', 'h']
-COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown']
+COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown', 'pink', 'orange']
 
 
 
@@ -63,6 +63,7 @@ def get_avg_std(filepath, acqs, suffix="t1-g1"):
 
     return avg, std
 
+
 def plot_acc_from_npz(filepath, suffix="t1-g1", acqs=['vopt_gr', 'vopt_p2'], dataset_title="2 Moons", err_bar=False):
     '''
     Plot the Accuracy from the runs contained in the npz file at **filename**
@@ -91,6 +92,7 @@ def plot_acc_from_npz(filepath, suffix="t1-g1", acqs=['vopt_gr', 'vopt_p2'], dat
 
 
 
+
 def show_al_choices(X, labels, labeled, n_start=0, acq_name='vopt_gr'):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -98,7 +100,7 @@ def show_al_choices(X, labels, labeled, n_start=0, acq_name='vopt_gr'):
     ax.scatter(X[labels==-1, 0], X[labels==-1,1], marker='x', c='b', alpha=0.6)
     ax.scatter(X[labeled[:n_start],0], X[labeled[:n_start],1], marker='^', c='g', alpha=0.8, s=100, label='Starting Choices')
     ax.scatter(X[labeled[n_start:],0], X[labeled[n_start:],1], marker='*', c='#ffff00', alpha=1.0, s=190, label='Acquisition Choices', edgecolor='k')
-    ax.title(latex_name[acq_name])
+    ax.set_title(latex_name[acq_name])
     return ax
 
 
@@ -107,6 +109,7 @@ def show_many_al_choices(X, labels, filename, acqs, n_start=0):
     for acq in acqs:
         if acq not in LABELED:
             print("Did not find data for %s acquisition function, continuing without it..." % acq)
-        ax = show_al_choices(X, labels, LABELED[acq][ind])
-        plt.show()
+        else:
+            ax = show_al_choices(X, labels, LABELED[acq], n_start=n_start, acq_name=acq)
+            plt.show()
     return
