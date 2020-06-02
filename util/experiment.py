@@ -211,12 +211,19 @@ def test(w, v, labels, gamma, tau, n_eig,
                         exact_update = False,
                         acc_classifier_name="probit2", model_classifier_name="probit2",
                         acquisition=acq[:-2])
+        elif acq == "random":
+            acc[acq], labeled[acq] = run_experiment(w, v, labels,
+                        tau = tau, gamma = gamma, n_eig = n_eig,
+                        num_to_query = num_to_query,
+                        n_start  = n_start, seed = seed,
+                        exact_update = True,
+                        acc_classifier_name="probit2", model_classifier_name="probit2",
+                        acquisition=acq)
+        else: 
+            print("acq not found: " + acq)
 
         np.savez(filename + "acc.npz", **acc)
         np.savez(filename + "labeled.npz", **labeled)
-
-
-
     return acc, labeled
 
 
