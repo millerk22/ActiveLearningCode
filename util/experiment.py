@@ -95,8 +95,11 @@ def run_experiment_hf(w, v, L_un, labels, tau =0.1, gamma=0.1, num_to_query = 10
                         truncation
     """
 
+    acc_class = False
+    if acc_classifier_name is not "hf":
+        acc_class = True
+        acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
 
-    acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
     model_classifier = Classifier_HF(tau, L_un)
     np.random.seed(seed)
     labeled =  list(np.random.choice(np.where(labels == -1)[0],
@@ -105,8 +108,7 @@ def run_experiment_hf(w, v, L_un, labels, tau =0.1, gamma=0.1, num_to_query = 10
                         size=n_start//2, replace=False))
     unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
 
-    # Accuracy Model MAP estimator
-    acc_m = acc_classifier.get_m(labeled, labels[labeled])
+
 
     # Harmonic Function labels in {0,1}
     labels_hf = copy.deepcopy(labels)
@@ -119,7 +121,13 @@ def run_experiment_hf(w, v, L_un, labels, tau =0.1, gamma=0.1, num_to_query = 10
 
     # Instantiate accuracy
     acc = []
-    acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
+    # Accuracy Model MAP estimator
+    if acc_class:
+        acc_m = acc_classifier.get_m(labeled, labels[labeled])
+        acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
+    else:
+        acc.append(get_acc(2*m - 1., labels[unlabeled], unlabeled = None)[1])
+
 
     num_batch = num_to_query // 4
     for i in range(num_to_query):
@@ -140,8 +148,11 @@ def run_experiment_hf(w, v, L_un, labels, tau =0.1, gamma=0.1, num_to_query = 10
         C = C[np.ix_(unl_hf, unl_hf)]
 
         unlabeled = list(filter(lambda x: x not in labeled, range(len(labels))))
-        acc_m = acc_classifier.get_m(labeled, labels[labeled]) # accuracy classifier is in +1, -1 classification
-        acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
+        if acc_class:
+            acc_m = acc_classifier.get_m(labeled, labels[labeled]) # accuracy classifier is in +1, -1 classification
+            acc.append(get_acc(acc_m, labels, unlabeled = unlabeled)[1])
+        else:
+            acc.append(get_acc(2*m-1., labels[unlabeled], unlabeled = None)[1])
 
         n_hf -= 1
     return acc, labeled
@@ -216,11 +227,9 @@ def test(w, v, labels, gamma, tau, n_eig,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
-                        exact_update = True,
+                        exact_update = False,
                         acc_classifier_name="probit2", model_classifier_name="probit2",
                         acquisition=acq)
-        else: 
-            print("acq not found: " + acq)
 
         np.savez(filename + "acc.npz", **acc)
         np.savez(filename + "labeled.npz", **labeled)
@@ -257,8 +266,58 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
                         tau = tau, gamma = gamma,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
-                        acc_classifier_name="probit2", acquisition=acq)
+                        acc_classifier_name="hf", acquisition=acq)
 
         np.savez(filename + "acc.npz", **acc)
         np.savez(filename + "labeled.npz", **labeled)
     return acc, labeled
+
+
+
+def acc_under_diff_model(labeled, labels, n_start=10, model_name='probit2', tau=0.1, gamma=0.1, w=None, v=None):
+    N = len(labels)
+    l_curr = list(labeled[:n_start])
+    ul_curr = list(filter(lambda x: x not in l_curr, range(N)))
+    classifier = Classifier(model_name, gamma, tau, v, w)
+    m = classifier.get_m(l_curr, labels[l_curr])
+
+    acc = []
+    acc.append(get_acc(m, labels, unlabeled=ul_curr)[1])
+    for k in labeled[n_start:]:
+        l_curr += [k]
+        ul_curr = list(filter(lambda x: x not in l_curr, range(N)))
+
+        m = classifier.get_m(l_curr, labels[l_curr])
+        acc.append(get_acc(m, labels, unlabeled=ul_curr)[1])
+
+    return acc
+
+def acc_under_hf_model(labeled, labels, n_start=10, tau=0.1, L_un=None):
+    N = len(labels)
+    l_curr = list(labeled[:n_start])
+    ul_curr = list(filter(lambda x: x not in l_curr, range(N)))
+    classifier = Classifier_HF(tau, L_un)
+    labels_hf = labels.copy()
+    labels_hf[labels_hf == -1] = 0
+
+    m = classifier.get_m(l_curr, labels_hf[l_curr])
+    C = classifier.get_C(l_curr)
+    acc = []
+    acc.append(get_acc(2*m - 1., labels[ul_curr])[1])
+    n_hf = N - n_start
+
+    for k in labeled[n_start:]:
+        k_hf = ul_curr.index(k)
+        l_curr += [k]
+
+        ul_curr = list(filter(lambda x: x not in l_curr, range(N)))
+        unl_hf = list(filter(lambda x: x != k_hf, range(n_hf)))
+        m = m + (labels_hf[k] - m[k_hf])*C[k_hf,:]/C[k_hf,k_hf]
+        m = m[unl_hf]
+        C -= np.outer(C[k_hf,:], C[k_hf,:])/C[k_hf,k_hf]
+        C = C[np.ix_(unl_hf, unl_hf)]
+        acc.append(get_acc(2*m-1., labels[ul_curr])[1])
+
+        n_hf -= 1
+
+    return acc

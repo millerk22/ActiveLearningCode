@@ -69,15 +69,19 @@ class Classifier_HF(object):
 
     def get_m(self, Z, y):
         Zbar = list(filter(lambda x: x not in Z, range(self.L.shape[0])))
-        return -self.get_C(Z, Zbar=Zbar) @ self.L[np.ix_(Zbar, Z)] @ y
+        self.m = -self.get_C(Z, Zbar=Zbar) @ self.L[np.ix_(Zbar, Z)] @ y
+        return self.m
 
     def get_C(self, Z, Zbar=None):
         if Zbar is None:
             Zbar = list(filter(lambda x: x not in Z, range(self.L.shape[0])))
         if self.sparse:
-            return scipy.sparse.linalg.inv(self.L[np.ix_(Zbar, Zbar)]).toarray() # inverse will be dense anyway
+            self.C = scipy.sparse.linalg.inv(self.L[np.ix_(Zbar, Zbar)]).toarray() # inverse will be dense anyway
+            return self.C
         else:
-            return sla.inv(self.L[np.ix_(Zbar, Zbar)])
+            self.C = sla.inv(self.L[np.ix_(Zbar, Zbar)])
+            return self.C
+
 
 ###############################################################################
 ############### Gaussian Regression Helper Functions ##########################
@@ -352,7 +356,6 @@ def probit_map_dr2(Z_, yvals, gamma, Ct):
     Probit MAP estimator, using dimensionality reduction via Representer Theorem.
     *** This uses logistic cdf ***
     """
-
     Ctp = Ct[np.ix_(Z_,Z_)]
     Jj = len(yvals)
 
