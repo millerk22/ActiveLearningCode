@@ -13,7 +13,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
                    num_to_query = 10,
                    n_start  = 10, seed = 42,
                    exact_update = True,
-                   acc_classifier_name="probit",
+                   acc_classifier_name=None,
                    model_classifier_name = "probit",
                    acquisition="modelchange_p"):
 
@@ -34,8 +34,11 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
     #d = (tau ** (2.)) * ((w + tau**2.) ** (-1.))
     #Ct = v @ sp.sparse.diags(d, format='csr') @ v.T
     #Ct_inv = v @ sp.sparse.diags(1./d, format='csr') @ v.T
-    acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
     model_classifier = Classifier(model_classifier_name, gamma, tau, v=v, w=w)
+    if acc_classifier_name is None:
+        acc_classifier = model_classifier
+    else:
+        acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
     np.random.seed(seed)
 
     labeled_orig =  list(np.random.choice(np.where(labels == -1)[0],
@@ -81,7 +84,7 @@ def run_experiment(w, v, labels, tau = 0.1, gamma = 0.1, n_eig = None,
 
 
 def run_experiment_hf(w, v, L_un, labels, tau =0.1, gamma=0.1, num_to_query = 10,
-                   n_start  = 10, seed = 42, acc_classifier_name = "probit2",
+                   n_start  = 10, seed = 42, acc_classifier_name = "hf",
                    acquisition="modelchange_hf"):
 
     """
@@ -94,9 +97,8 @@ def run_experiment_hf(w, v, L_un, labels, tau =0.1, gamma=0.1, num_to_query = 10
         probit2:        probit with logistic likelihood without spectral
                         truncation
     """
-
     acc_class = False
-    if acc_classifier_name is not "hf":
+    if acc_classifier_name != "hf":
         acc_class = True
         acc_classifier = Classifier(acc_classifier_name, gamma, tau, v=v, w=w)
 
@@ -189,14 +191,16 @@ def test(w, v, labels, gamma, tau, n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = True,
-                        acc_classifier_name="probit2", model_classifier_name="gr", acquisition=acq)
+                        acc_classifier_name=None, 
+                        model_classifier_name="gr", 
+                        acquisition=acq)
         elif acq in ("modelchange_p2", "vopt_p2", "mbr_p2", "vopt_new_p2"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = True,
-                        acc_classifier_name="probit2", model_classifier_name="probit2",
+                        acc_classifier_name=None, model_classifier_name="probit2",
                         acquisition=acq)
         elif acq in ("modelchange_p", "vopt_p", "mbr_p", "vopt_new_p"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
@@ -204,7 +208,7 @@ def test(w, v, labels, gamma, tau, n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = True,
-                        acc_classifier_name="probit2", model_classifier_name="probit",
+                        acc_classifier_name=None, model_classifier_name="probit",
                         acquisition=acq)
         elif acq in ("modelchange_pNA", "vopt_pNA", "mbr_pNA"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
@@ -212,7 +216,7 @@ def test(w, v, labels, gamma, tau, n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = False,
-                        acc_classifier_name="probit2", model_classifier_name="probit",
+                        acc_classifier_name=None, model_classifier_name="probit",
                         acquisition=acq[:-2])
         elif acq in ("modelchange_p2NA", "vopt_p2NA", "mbr_p2NA"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
@@ -220,7 +224,7 @@ def test(w, v, labels, gamma, tau, n_eig,
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         exact_update = False,
-                        acc_classifier_name="probit2", model_classifier_name="probit2",
+                        acc_classifier_name=None, model_classifier_name="probit2",
                         acquisition=acq[:-2])
         elif acq == "random":
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
