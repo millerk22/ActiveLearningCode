@@ -30,7 +30,8 @@ latex_name ={"modelchange_p2":"Probit MC",
          "mbr_p2NA" : "Probit MBR NA",
          "mbr_hf":"HF MBR",
          "vopt_hf": "HF VOpt",
-         "sopt_hf":"HF SOpt"}
+         "sopt_hf":"HF SOpt",
+         "random":"Random"}
 
 MARKERS = ['o','*', 'v', '^', '<', '>', '8', 's', 'p', 'h']
 COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown', 'pink', 'orange']
@@ -64,7 +65,7 @@ def get_avg_std(filepath, acqs, suffix="t1-g1"):
     return avg, std
 
 
-def plot_acc_from_npz(filepath, suffix="t1-g1", acqs=['vopt_gr', 'vopt_p2'], dataset_title="2 Moons", err_bar=False):
+def plot_acc_from_npz(filepath, suffix="t1-g1", acqs=['vopt_gr', 'vopt_p2'], dataset_title="2 Moons", err_bar=False, stride=1):
     '''
     Plot the Accuracy from the runs contained in the npz file at **filename**
 
@@ -78,7 +79,8 @@ def plot_acc_from_npz(filepath, suffix="t1-g1", acqs=['vopt_gr', 'vopt_p2'], dat
     ax = fig.add_subplot(1,1,1)
     for acq in means:
         if not err_bar:
-            ax.plot(means[acq], color = COLORS[c], label=latex_name[acq])
+            ax.scatter(range(means[acq].shape[0])[::stride], means[acq][::stride], c=COLORS[c], marker=MARKERS[c], label=latex_name[acq])
+            ax.plot(means[acq], color = COLORS[c])#, label=latex_name[acq])
         else:
             ax.errorbar(np.arange(1, means[acq].shape[0]+1), means[acq], yerr=stds[acq], label=latex_name[acq], color=COLORS[c]) #fmt='o', color='black',ecolor='lightgray', elinewidth=3, capsize=0)
 
