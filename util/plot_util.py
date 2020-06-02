@@ -110,6 +110,7 @@ def show_many_al_choices(X, labels, filename, acqs, n_start=0):
         if acq not in LABELED:
             print("Did not find data for %s acquisition function, continuing without it..." % acq)
         else:
+            print(LABELED[acq].shape)
             ax = show_al_choices(X, labels, LABELED[acq], n_start=n_start, acq_name=acq)
             plt.show()
     return
