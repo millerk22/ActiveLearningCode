@@ -195,7 +195,7 @@ def test(w, v, labels, gamma, tau, n_eig,
                         exact_update = True,
                         acc_classifier_name="probit2", model_classifier_name="probit",
                         acquisition=acq)
-        elif acq in ("modelchange_pNA", "vopt_pNA"):
+        elif acq in ("modelchange_pNA", "vopt_pNA", "mbr_pNA"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
@@ -203,7 +203,7 @@ def test(w, v, labels, gamma, tau, n_eig,
                         exact_update = False,
                         acc_classifier_name="probit2", model_classifier_name="probit",
                         acquisition=acq[:-2])
-        elif acq in ("modelchange_p2NA", "vopt_p2NA"):
+        elif acq in ("modelchange_p2NA", "vopt_p2NA", "mbr_p2NA"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
@@ -237,10 +237,10 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
     '''
     print(filename)
     if not os.path.exists(filename):
-        os.mkdir(filename)
+        os.makedirs(filename)
     try:
-        print("Found data from other test function (i.e. GR or Probit models), adding the results of  \
-        these harmonic function test to the .npz files found")
+        print("Found data from the other test function (i.e. GR or Probit models), adding the results of  \
+        these harmonic function tests to the .npz files found")
         acc = dict(np.load(filename + "acc.npz"))
         labeled = dict(np.load(filename + "labeled.npz"))
     except:
@@ -259,6 +259,6 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
                         n_start  = n_start, seed = seed,
                         acc_classifier_name="probit2", acquisition=acq)
 
-        np.savez(filename + "acc_hf.npz", **acc)
-        np.savez(filename + "labeled_hf.npz", **labeled)
+        np.savez(filename + "acc.npz", **acc)
+        np.savez(filename + "labeled.npz", **labeled)
     return acc, labeled
