@@ -33,7 +33,7 @@ latex_name ={"modelchange_p2":"Probit MC",
          "sopt_hf":"HF SOpt",
          "random":"Random"}
 
-MARKERS = ['o','*', 'v', '^', '<', '>', '8', 's', 'p', 'h']
+MARKERS = ['+', 'x', '^', '*', 'v', '^', '<', '>', 'o', 's', 'p', 'h']
 COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown', 'pink', 'orange']
 
 
@@ -77,7 +77,7 @@ def plot_acc_from_npz(filepath, suffix="t1-g1", acqs=['vopt_gr', 'vopt_p2'], dat
     c = 0
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for acq in means:
+    for acq in acqs:
         if not err_bar:
             ax.scatter(range(means[acq].shape[0])[::stride], means[acq][::stride], c=COLORS[c], marker=MARKERS[c], label=latex_name[acq])
             ax.plot(means[acq], color = COLORS[c])#, label=latex_name[acq])
