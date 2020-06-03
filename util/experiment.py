@@ -184,7 +184,8 @@ def test(w, v, labels, gamma, tau, n_eig,
         if acq in acc and acq in labeled:
             print("Found existing results")
             continue
-        if acq in ("modelchange_gr", "vopt_gr", "mbr_gr", "sopt_gr"):
+        if acq in ("modelchange_gr", "vopt_gr", "mbr_gr", 
+                   "sopt_gr", "uncertainty_gr"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma,
                         n_eig = n_eig,
@@ -194,7 +195,8 @@ def test(w, v, labels, gamma, tau, n_eig,
                         acc_classifier_name=None, 
                         model_classifier_name="gr", 
                         acquisition=acq)
-        elif acq in ("modelchange_p2", "vopt_p2", "mbr_p2", "vopt_new_p2"):
+        elif acq in ("modelchange_p2", "vopt_p2", "mbr_p2", 
+                     "vopt_new_p2", "uncertainty_p2"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
@@ -202,7 +204,8 @@ def test(w, v, labels, gamma, tau, n_eig,
                         exact_update = True,
                         acc_classifier_name=None, model_classifier_name="probit2",
                         acquisition=acq)
-        elif acq in ("modelchange_p", "vopt_p", "mbr_p", "vopt_new_p"):
+        elif acq in ("modelchange_p", "vopt_p", "mbr_p", 
+                     "vopt_new_p", "uncertainty_p"):
             acc[acq], labeled[acq] = run_experiment(w, v, labels,
                         tau = tau, gamma = gamma, n_eig = n_eig,
                         num_to_query = num_to_query,
@@ -226,15 +229,8 @@ def test(w, v, labels, gamma, tau, n_eig,
                         exact_update = False,
                         acc_classifier_name=None, model_classifier_name="probit2",
                         acquisition=acq[:-2])
-        elif acq == "random":
-            acc[acq], labeled[acq] = run_experiment(w, v, labels,
-                        tau = tau, gamma = gamma, n_eig = n_eig,
-                        num_to_query = num_to_query,
-                        n_start  = n_start, seed = seed,
-                        exact_update = False,
-                        acc_classifier_name="probit2", model_classifier_name="probit2",
-                        acquisition=acq)
-
+        else:
+            pass
         np.savez(filename + "acc.npz", **acc)
         np.savez(filename + "labeled.npz", **labeled)
     return acc, labeled
@@ -265,7 +261,8 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
         if acq in acc and acq in labeled:
             print("Found existing results")
             continue
-        if acq in ("vopt_hf", "sopt_hf", "mbr_hf"):
+        if acq in ("vopt_hf", "sopt_hf", "mbr_hf", 
+                   "random_hf", "uncertainty_hf"):
             acc[acq], labeled[acq] = run_experiment_hf(w, v, L_un, labels,
                         tau = tau, gamma = gamma,
                         num_to_query = num_to_query,
@@ -278,6 +275,44 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
 
 
 
+def test_random(w, v, L_un, labels, gamma, tau, num_to_query, 
+                n_start, seed, filename):
+    print(filename)
+    if not os.path.exists(filename):
+        os.makedirs(filename)
+    try:
+        print("Found data from the other test function (i.e. GR or Probit models), adding the results of  \
+        these harmonic function tests to the .npz files found")
+        acc = dict(np.load(filename + "acc.npz"))
+        labeled = dict(np.load(filename + "labeled.npz"))
+    except:
+        acc = {}
+        labeled = {}
+
+    np.random.seed(seed)
+    labeled_orig =  list(np.random.choice(np.where(labels == -1)[0],
+                        size=n_start//2, replace=False))
+    labeled_orig += list(np.random.choice(np.where(labels ==  1)[0],
+                        size=n_start//2, replace=False))
+    unlabeled = list(filter(lambda x: x not in labeled_orig, 
+                     range(len(labels))))
+    labeled["random"] = labeled_orig + list(np.random.choice(unlabeled, 
+                                       size = num_to_query, replace = False))
+    acc["random_p2"] = acc_under_diff_model(labeled["random"], labels,          
+                       n_start = n_start, model_name = 'probit2', 
+                       tau = tau, gamma = gamma, w = w, v = v)
+    acc["random_gr"] = acc_under_diff_model(labeled["random"], labels,          
+                       n_start = n_start, model_name = 'gr', 
+                       tau = tau, gamma = gamma, w = w, v = v)
+    acc["random_hf"] = acc_under_hf_model(labeled["random"], labels,
+                       n_start = n_start, tau = tau,
+                       L_un = L_un)
+                     
+    np.savez(filename + "acc.npz", **acc)
+    np.savez(filename + "labeled.npz", **labeled)
+    return acc, labeled
+
+    
 def acc_under_diff_model(labeled, labels, n_start=10, model_name='probit2', tau=0.1, gamma=0.1, w=None, v=None):
     N = len(labels)
     l_curr = list(labeled[:n_start])

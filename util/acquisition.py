@@ -61,8 +61,10 @@ def get_k(C, unlabeled, acquisition, gamma=0.1, m = None, y=None):
         return vopt_p_new(C, unlabeled, gamma, m, probit_norm=True)
     elif acquisition == "vopt_new_p2":
         return vopt_p_new(C, unlabeled, gamma, m, probit_norm=False)
-    elif acquisition == "random":
-        return np.random.choice(unlabeled, 1)[0]
+    elif acquisition in ("uncertainty_gr", "uncertainty_p", "uncertainty_p2"):
+        return uncertainty(unlabeled, m)
+    elif acquisition == "uncertainty_hf":
+        return uncertainty_hf(m)
     elif acquisition == "vopt_hf": # Note Harmonic Function acquisitions return in the index in the unlabeled subset,
         return vopt_hf(C)           # NOT in the full index set of total nodes
     elif acquisition == "sopt_hf":
@@ -372,3 +374,10 @@ def mbr_p(C, unlabeled, gamma, m, probit_norm=False):
     mbr = [EE_p(k, m, C, gamma, probit_norm) for k in unlabeled]
     k_mbr = unlabeled[np.argmin(mbr)]
     return k_mbr
+
+def uncertainty(unlabeled, m):
+    # m[i] in -1, 1
+    return unlabeled[np.argmin(np.abs(m[unlabeled]))]
+
+def uncertainty_hf(m):
+    return np.argmin(np.abs(m - 0.5))
