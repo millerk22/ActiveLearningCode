@@ -20,6 +20,7 @@ plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 latex_name ={"modelchange_p2":"Probit MC",
          "vopt_p2":"Probit VOpt",
+         "vopt_p" :"Probit VOpt",
          "modelchange_gr":"GR MC",
          "sopt_gr":"GR SOpt",
          "vopt_gr":"GR VOpt",
@@ -31,7 +32,15 @@ latex_name ={"modelchange_p2":"Probit MC",
          "mbr_hf":"HF MBR",
          "vopt_hf": "HF VOpt",
          "sopt_hf":"HF SOpt",
-         "random":"Random"}
+         "random_gr":"GR Random",
+         "random":"Probit Random",
+         "random_p2":"Probit Random",
+         "random_p":"Probit Random",
+         "random_hf":"HF Random",
+         "uncertainty_hf":"HF Uncertainty",
+         "uncertainty_gr":"GR Uncertainty",
+         "uncertainty_p2":"Probit Uncertainty",
+         "uncertainty_p":"Probit Uncertainty"}
 
 MARKERS = ['+', 'x', '^', '*', 'v', '^', '<', '>', 'o', 's', 'p', 'h']
 COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown', 'pink', 'orange']
