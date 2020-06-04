@@ -42,9 +42,16 @@ latex_name ={"modelchange_p2":"Probit MC",
          "uncertainty_p2":"Probit Uncertainty",
          "uncertainty_p":"Probit Uncertainty"}
 
-MARKERS = ['+', 'x', '^', '*', 'v', '^', '<', '>', 'o', 's', 'p', 'h']
+MARKERS = ['+', 'x', '^', '*', 'v', '<', '>', 'o', 's', 'p', 'h']
 COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown', 'pink', 'orange']
-
+MCDICT = {"vopt": ('v', 'r'), "sopt":("^", 'g'), "mbr":('x', 'k'), "modelchange": ("+", 'b') ,
+        "random": ("o", 'pink'), "uncertainty": ('*','purple')}
+def acq2markercolor(acq):
+    for k in MCDICT:
+        if re.search(k, acq):
+            return MCDICT[k]
+    print("Didnt find method in MCDICT.keys()..")
+    return ('cyan', 'p')
 
 
 def get_avg_std(filepath, acqs, suffix="t1-g1"):
@@ -87,11 +94,12 @@ def plot_acc_from_npz(filepath, suffix="t1-g1", acqs=['vopt_gr', 'vopt_p2'], dat
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     for acq in acqs:
+        mkr, clr = acq2markercolor(acq)
         if not err_bar:
-            ax.scatter(range(means[acq].shape[0])[::stride], means[acq][::stride], c=COLORS[c], marker=MARKERS[c], label=latex_name[acq])
-            ax.plot(means[acq], color = COLORS[c])#, label=latex_name[acq])
+            ax.scatter(range(means[acq].shape[0])[::stride], means[acq][::stride], c=clr, marker=mkr, label=latex_name[acq])
+            ax.plot(means[acq], color =clr)#, label=latex_name[acq])
         else:
-            ax.errorbar(np.arange(1, means[acq].shape[0]+1), means[acq], yerr=stds[acq], label=latex_name[acq], color=COLORS[c]) #fmt='o', color='black',ecolor='lightgray', elinewidth=3, capsize=0)
+            ax.errorbar(np.arange(1, means[acq].shape[0]+1), means[acq], yerr=stds[acq], label=latex_name[acq], color=clr) #fmt='o', color='black',ecolor='lightgray', elinewidth=3, capsize=0)
 
         c += 1
     ax.set_title(dataset_title + " Accuracy Comparison")
@@ -118,10 +126,11 @@ def show_al_choices(X, labels, labeled, n_start=0, acq_name='vopt_gr'):
 def show_many_al_choices(X, labels, filename, acqs, n_start=0):
     LABELED = np.load(filename + "/labeled.npz")
     for acq in acqs:
+        if re.search(r'random', acq):
+            acq = 'random'
         if acq not in LABELED:
             print("Did not find data for %s acquisition function, continuing without it..." % acq)
         else:
-            print(LABELED[acq].shape)
             ax = show_al_choices(X, labels, LABELED[acq], n_start=n_start, acq_name=acq)
             plt.show()
     return
