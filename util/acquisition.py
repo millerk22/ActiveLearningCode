@@ -140,7 +140,8 @@ def sopt_gr(C, unlabeled, gamma):
     '''
     Compute the Sigma-opt criterion adapted to the Gaussian Regression model
     '''
-    sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1)
+    #sums = np.sum(C[np.ix_(unlabeled,unlabeled)], axis=1) # this is wrong...
+    sums = np.sum(C[unlabeled,:], axis=1)
     s_opt = sums/(gamma**2. + np.diag(C)[unlabeled])
     k_max = unlabeled[np.argmax(s_opt)]
     return k_max

@@ -207,6 +207,10 @@ def plot_iter(m, X, labels, labeled, k_next=-1, title=None, subplot=False):
     plt.scatter(X[incorr1,0], X[incorr1,1], marker='x', c='r', alpha=0.2)
     plt.scatter(X[corr2,0], X[corr2,1], marker='o', c='r',alpha=0.15)
     plt.scatter(X[incorr2,0], X[incorr2,1], marker='o', c='b',alpha=0.15)
+    plt.scatter(X[corr1,0], X[corr1,1], marker='x', c='b', alpha=0.8)
+    plt.scatter(X[incorr1,0], X[incorr1,1], marker='x', c='r', alpha=0.8)
+    plt.scatter(X[corr2,0], X[corr2,1], marker='o', c='r',alpha=0.8)
+    plt.scatter(X[incorr2,0], X[incorr2,1], marker='o', c='b',alpha=0.8)
 
     sup1 = list(set(labeled).intersection(set(np.where(labels == 1)[0])))
     sup2 = list(set(labeled).intersection(set(np.where(labels == -1)[0])))
