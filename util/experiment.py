@@ -174,13 +174,14 @@ def test(w, v, labels, gamma, tau, n_eig,
         acc = {}
         labeled = {}
 
-
+    timing = {}
     # IDEA: Save parameters in dictionary in this directory? Check the parameters before the test, in
     # case of running different acquisition functions, with different parameters than the rest
     # of the tests in the current directory?
 
     for acq in acqs:
         print(acq)
+        ts = time.time()
         if acq in acc and acq in labeled:
             print("Found existing results")
             continue
@@ -231,9 +232,12 @@ def test(w, v, labels, gamma, tau, n_eig,
                         acquisition=acq[:-2])
         else:
             pass
+        timing[acq] = time.time() - ts
+        print("{} takes {} seconds".format(acqs, timing[acq]))
         np.savez(filename + "acc.npz", **acc)
         np.savez(filename + "labeled.npz", **labeled)
-    return acc, labeled
+        np.savez(filename + "timing.npz", **timing)
+    return acc, labeled, timing
 
 
 
@@ -256,8 +260,10 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
         acc = {}
         labeled = {}
 
+    timing = {}
     for acq in [a for a in acqs if a[-2:] == "hf"]:
         print(acq)
+        ts = time.time()
         if acq in acc and acq in labeled:
             print("Found existing results")
             continue
@@ -268,10 +274,12 @@ def test_hf(w, v, L_un, labels, gamma, tau, num_to_query, n_start, seed, filenam
                         num_to_query = num_to_query,
                         n_start  = n_start, seed = seed,
                         acc_classifier_name="hf", acquisition=acq)
-
+        timing[acq] = time.time() - ts
+        print("{} takes {} seconds".format(acqs, timing[acq]))
         np.savez(filename + "acc.npz", **acc)
         np.savez(filename + "labeled.npz", **labeled)
-    return acc, labeled
+        np.savez(filename + "timing.npz", **timing)
+    return acc, labeled, timing
 
 
 
