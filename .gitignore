@@ -12,4 +12,5 @@ datasets/__pycache__/
 *_old.py
 __pycache__/
 plotting_script.py
+*.pdf
 
