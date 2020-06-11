@@ -43,12 +43,17 @@ latex_name ={"modelchange_p2":"Probit MC",
          "uncertainty_p":"Probit Uncertainty"}
 
 MARKERS = ['+', 'x', '^', '*', 'v', '<', '>', 'o', 's', 'p', 'h']
-COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown', 'pink', 'orange']
+COLORS = ['b', 'g', 'r', 'k', 'y', 'purple', 'cyan', 'brown', 'pink', 'orange', 'cyan', 'g', 'pink', 'orange']
 MCDICT = {"vopt": ('v', 'r'), "sopt":("^", 'g'), "mbr":('x', 'k'), "modelchange": ("+", 'b') ,
         "random": ("o", 'pink'), "uncertainty": ('*','purple')}
 def acq2markercolor(acq):
     for k in MCDICT:
         if re.search(k, acq):
+            v = MCDICT[k]
+            if acq[-2:] == "NA":
+                ind = COLORS.index(v[1]) + 1
+                print(acq, ind)
+                return (v[0], COLORS[-ind])
             return MCDICT[k]
     print("Didnt find method in MCDICT.keys()..")
     return ('cyan', 'p')
@@ -117,7 +122,8 @@ def show_al_choices(X, labels, labeled, n_start=0, acq_name='vopt_gr'):
     ax = fig.add_subplot(1,1,1)
     ax.scatter(X[labels==1, 0], X[labels==1,1], marker='o', c='r', alpha=0.6)
     ax.scatter(X[labels==-1, 0], X[labels==-1,1], marker='x', c='b', alpha=0.6)
-    ax.scatter(X[labeled[:n_start],0], X[labeled[:n_start],1], marker='^', c='g', alpha=0.8, s=100, label='Starting Choices')
+    #ax.scatter(X[labeled[:n_start],0], X[labeled[:n_start],1], marker='^', c='g', alpha=0.8, s=100, label='Starting Choices')
+    ax.scatter(X[labeled[:n_start],0], X[labeled[:n_start],1], marker='*', c='#ffff00', alpha=1.0, s=190, label='Starting Choices',edgecolor='k')
     ax.scatter(X[labeled[n_start:],0], X[labeled[n_start:],1], marker='*', c='#ffff00', alpha=1.0, s=190, label='Acquisition Choices', edgecolor='k')
     ax.set_title(latex_name[acq_name])
     return ax
@@ -132,5 +138,9 @@ def show_many_al_choices(X, labels, filename, acqs, n_start=0):
             print("Did not find data for %s acquisition function, continuing without it..." % acq)
         else:
             ax = show_al_choices(X, labels, LABELED[acq], n_start=n_start, acq_name=acq)
+            ax.set_title('')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            plt.savefig(filename+"/cb-%s.pdf"%acq)
             plt.show()
     return
