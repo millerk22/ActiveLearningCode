@@ -150,7 +150,43 @@ class Graph_manager(object):
                             A_indptr),
                             shape=(N, N))
         W = (W + W.T)/2
+        # W.setdiag(0)
+        # W.eliminate_zeros()
         return W
+
+    def compute_cost(self, X, knn, sigma=1, zp_k=None):
+        """
+        Computes similarity graph using parameters specified in self.param
+        """
+        # Probably we want to set all default parameters in one place
+        N = len(X)
+        if knn is None:
+            knn = N
+
+        if knn > N / 2:
+            nn = NearestNeighbors(n_neighbors=knn, algorithm='brute').fit(X)
+        else:
+            nn = NearestNeighbors(n_neighbors=knn, algorithm='ball_tree').fit(X)
+
+        # modify from the kneighbors_graph function from sklearn to
+        # accomodate Zelnik-Perona scaling
+        n_nonzero = N * knn
+        A_indptr = np.arange(0, n_nonzero + 1, knn)
+        # construct CSR matrix representation of the k-NN graph
+        A_data, A_ind = nn.kneighbors(X, knn+1, return_distance=True)
+        A_data, A_ind = A_data[:,1:], A_ind[:,1:]
+        if zp_k is not None:
+            k_dist = A_data[:,zp_k][:,np.newaxis]
+            k_dist[k_dist < 1e-4] = 1e-4
+            A_data /= np.sqrt(k_dist * k_dist[A_ind,0])
+
+        #A_data = np.ravel(A_data)
+        C = sps.csr_matrix((np.exp((A_data.ravel() ** 2)/sigma),
+                            A_ind.ravel(),
+                            A_indptr),
+                            shape=(N, N))
+        C = (C + C.T)/2
+        return C
 
     def compute_laplacian(self, W, Ltype):
         """

@@ -290,7 +290,7 @@ def vopt_p_new(C, unlabeled, gamma, m, dumb=False, probit_norm=False):
     return k_max
 
 
-def modelchange_p(C, unlabeled, gamma, m, probit_norm=False):
+def modelchange_p(C, unlabeled, gamma, m, probit_norm=False, debug=False):
     '''
     Compute the model change criterion under the probit model (with Gaussian approximations of Probit posterior).
     '''
@@ -303,6 +303,8 @@ def modelchange_p(C, unlabeled, gamma, m, probit_norm=False):
            np.absolute(jac_calc2(m[k], 1, gamma)/(1. + C[k,k]*hess_calc2(m[k], 1, gamma )))) \
                        * np.linalg.norm(C[k,:]) for k in unlabeled]
     k_mc = unlabeled[np.argmax(mc)]
+    if debug:
+        return k_mc, mc
     return k_mc
 
 
