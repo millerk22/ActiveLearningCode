@@ -12,5 +12,7 @@ datasets/__pycache__/
 *_old.py
 __pycache__/
 plotting_script.py
-*.pdf
-
+results/*
+util/acquisition_batch_new.py
+*.png
+pos_neg_plot.py
