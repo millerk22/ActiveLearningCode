@@ -499,4 +499,4 @@ def gr_C(Z, gamma, Ct):
 
 def gr_map(Z, y, gamma, Ct):
     C = gr_C(Z, gamma, Ct)
-    return (C[:,Z].dot(y))/(gamma * gamma)
+    return (C[:,Z] @ y)/(gamma * gamma)

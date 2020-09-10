@@ -64,8 +64,8 @@ class BinaryGraphBasedSSLModel(object):
                 elif self.modelname == 'probit-norm':
                     self.m -= jac_calc(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc(self.m[k], yk, self.gamma))*self.C[k,:]
                     self.C -= hess_calc(self.m[k], yk, self.gamma)/(1. + self.C[k,k]*hess_calc(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
-                else:
-                    raise ValueError("model name %s not recognized or implemented" % str(model))
+            else:
+                raise ValueError("model name %s not recognized or implemented" % str(self.modelname))
             self.labeled += list(Q)
             self.y += list(yQ)
         else:
@@ -101,12 +101,116 @@ class BinaryGraphBasedSSLModel(object):
             if len(y) <= len(self.w) or not self.trunc:
                 return Hess2_inv(m, Z, y, self.gamma, self.Ct)
             else:
-                return Hess2_inv_st2(m, Z, y, self.d, self.v, self.gamma)
+                return Hess_inv_st2(m, Z, y, self.d, self.v, self.gamma)
         elif self.modelname == "gr":
             return gr_C(Z, self.gamma, self.Ct)
         else:
             raise ValueError("did not recognize modelname = %s" % self.modelname)
 
+
+class MultiGraphBasedSSLModel(object):
+    '''
+    Implements full storage of C_tau, C.
+        * Can have truncated eigenvalues and eigenvectors
+
+
+    Get rid of storing eigenvectors and eigenvalues?? (Since we're already committing to storing C_tau and C fully)
+    '''
+    def __init__(self, modelname, gamma, tau, v=None, w=None, Ct=None):
+        self.gamma = gamma
+        self.tau = tau
+        if v is None:
+            raise ValueError("Need to provide the eigenvectors in the variable 'v'")
+        if w is None:
+            raise ValueError("Need to provide the eigenvalues in the variable 'w'")
+        self.v = v
+        if self.v.shape[0] != self.v.shape[1]:
+            self.trunc = True
+        else:
+            self.trunc = False
+        self.w = w
+        self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+        #self.d = self.w + self.tau**2.
+        if Ct is not None:
+            self.Ct = Ct
+        else:
+            self.Ct = (self.v * (1./self.d)) @ self.v.T
+        if modelname not in VALID_MODELS:
+            raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
+        self.modelname = modelname
+        self.full_storage = True
+        self.m = None
+        self.C = None
+        return
+
+    def calculate_model(self, labeled, y):
+        self.m = self.get_m(labeled, y)
+        self.C = self.get_C(labeled, y, self.m)
+        self.labeled = labeled
+        self.y = y
+        self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.C.shape[0])))
+        return
+
+    def update_model(self, Q, yQ, exact=False):
+        if self.m is None or self.C is None:
+            print("Previous model not defined, so assuming you are passing in initial labeled set and labelings...")
+            self.calculate_model(Q, yQ)
+            return
+        if not exact:
+            if self.modelname == 'gr':
+                for k,yk in zip(Q, yQ): # done
+                    self.m += self.C[:, k].reshape((-1, 1)) @ (yk - self.m[k])/(self.gamma**2 + self.C[k,k])
+                    self.C -= np.outer(self.C[:,k], self.C[:,k])/(self.gamma**2. + self.C[k,k])
+            elif self.modelname == 'probit-log':
+                for k,yk in zip(Q, yQ):
+                    self.m -= jac_calc2(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*self.C[k,:]
+                    self.C -= hess_calc2(self.m[k], yk, self.gamma)/(1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
+            elif self.modelname == 'probit-norm':
+                for k,yk in zip(Q, yQ):
+                    self.m -= jac_calc(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc(self.m[k], yk, self.gamma))*self.C[k,:]
+                    self.C -= hess_calc(self.m[k], yk, self.gamma)/(1. + self.C[k,k]*hess_calc(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
+            else:
+                raise ValueError("model name %s not recognized or implemented" % str(self.modelname))
+            self.labeled += list(Q)
+            self.y = np.concatenate((self.y, yQ))
+        else:
+            self.labeled += list(Q)
+            self.y = np.concatenate((self.y, yQ))
+            self.calculate_model(self.labeled, self.y)
+
+        return
+
+    def get_m(self, Z, y):
+        if self.modelname == "probit-norm":
+            if len(y) <= len(self.w):
+                return probit_map_dr(Z, y, self.gamma, self.Ct)
+            else:
+                return probit_map_st(Z, y, self.gamma, self.d, self.v)
+        elif self.modelname == "probit-log":
+            if len(y) <= len(self.w):
+                return probit_map_dr2(Z, y, self.gamma, self.Ct)
+            else:
+                return probit_map_st2(Z, y, self.gamma, self.d, self.v)
+        elif self.modelname == "gr":
+            return gr_map(Z, y, self.gamma, self.Ct)
+        else:
+            raise ValueError("did not recognize modelname = %s" % self.modelname)
+
+    def get_C(self, Z, y, m):
+        if self.modelname == "probit-norm":
+            if len(y) <= len(self.w) or not self.trunc:
+                return Hess_inv(m, Z, y, self.gamma, self.Ct)
+            else:
+                return Hess_inv_st(m, Z, y, self.d, self.v, self.gamma)
+        elif self.modelname == "probit-log":
+            if len(y) <= len(self.w) or not self.trunc:
+                return Hess2_inv(m, Z, y, self.gamma, self.Ct)
+            else:
+                return Hess_inv_st2(m, Z, y, self.d, self.v, self.gamma)
+        elif self.modelname == "gr":
+            return gr_C(Z, self.gamma, self.Ct)
+        else:
+            raise ValueError("did not recognize modelname = %s" % self.modelname)
 
 
 
