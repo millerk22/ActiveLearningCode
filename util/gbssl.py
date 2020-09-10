@@ -54,16 +54,14 @@ class BinaryGraphBasedSSLModel(object):
             self.calculate_model(Q, yQ)
             return
         if not exact:
-            if self.modelname == 'gr':
-                for k,yk in zip(Q, yQ):
+            for k,yk in zip(Q, yQ):
+                if self.modelname == 'gr':
                     self.m += (yk - self.m[k])/(self.gamma**2 + self.C[k,k])*self.C[:, k]
                     self.C -= np.outer(self.C[:,k], self.C[:,k])/(self.gamma**2. + self.C[k,k])
-            elif self.modelname == 'probit-log':
-                for k,yk in zip(Q, yQ):
+                elif self.modelname == 'probit-log':
                     self.m -= jac_calc2(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*self.C[k,:]
                     self.C -= hess_calc2(self.m[k], yk, self.gamma)/(1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
-            elif self.modelname == 'probit-norm':
-                for k,yk in zip(Q, yQ):
+                elif self.modelname == 'probit-norm':
                     self.m -= jac_calc(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc(self.m[k], yk, self.gamma))*self.C[k,:]
                     self.C -= hess_calc(self.m[k], yk, self.gamma)/(1. + self.C[k,k]*hess_calc(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
             else:
@@ -255,25 +253,28 @@ class BinaryGraphBasedSSLModelReduced(object):
         return
 
     def update_model(self, Q, yQ, exact=False):
-        if self.m is None or self.C is None:
+        if self.alpha is None or self.C_a is None:
             print("Previous model not defined, so assuming you are passing in initial labeled set and labelings...")
             self.calculate_model(Q, yQ)
             return
         if not exact:
-            if self.modelname == 'gr':
-                for k,yk in zip(Q, yQ):
-                    self.alpha += (yk - m[k])/(self.gamma**2 + self.C_a[k,k])*self.C_a[:, k]
-                    self.C_a -= np.outer(self.C_a[:,k], self.C[:,k])/(self.gamma**2. + self.C_a[k,k])
-            elif self.modelname == 'probit-log':
-                for k,yk in zip(Q, yQ):
-                    self.m -= jac_calc2(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*self.C[k,:]
-                    self.C -= hess_calc2(self.m[k], yk, self.gamma)/(1. + self.C[k,k]*hess_calc2(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
-            elif self.modelname == 'probit-norm':
-                for k,yk in zip(Q, yQ):
-                    self.m -= jac_calc(self.m[k], yk, gamma) / (1. + self.C[k,k] * hess_calc(self.m[k], yk, self.gamma))*self.C[k,:]
-                    self.C -= hess_calc(self.m[k], yk, gamma)/(1. + self.C[k,k]*hess_calc(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
-            else:
-                raise ValueError("model name %s not recognized or implemented" % str(model))
+            for k,yk in zip(Q, yQ):
+                C_a_vk = self.C_a @ (self.v[k,:].T)
+                ip = np.inner(self.v[k,:], C_a_vk)
+                mk = np.inner(self.v[k,:], self.alpha)
+                if self.modelname == 'gr':
+                    self.alpha += (yk - mk)/(self.gamma**2 + ip) * C_a_vk
+                    self.C_a -= np.outer(C_a_vk, C_a_vk)/(self.gamma**2. + ip)
+                elif self.modelname == 'probit-log':
+                    self.alpha -= jac_calc2(mk, yk, self.gamma) / (1. + ip * hess_calc2(mk, yk, self.gamma))*C_a_vk
+                    mk = np.inner(self.v[k,:], self.alpha)
+                    self.C_a -= hess_calc2(mk, yk, self.gamma)/(1. + ip * hess_calc2(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
+                elif self.modelname == 'probit-norm':
+                    self.alpha -= jac_calc(mk, yk, self.gamma) / (1. + ip * hess_calc(mk, yk, self.gamma))*C_a_vk
+                    mk = np.inner(self.v[k,:], self.alpha)
+                    self.C_a -= hess_calc(mk, yk, self.gamma)/(1. + ip * hess_calc(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
+                else:
+                    raise ValueError("model name %s not recognized or implemented" % str(model))
             self.m = self.v @ self.alpha
             self.labeled += list(Q)
             self.y += list(yQ)
