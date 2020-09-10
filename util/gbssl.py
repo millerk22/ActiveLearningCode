@@ -159,7 +159,7 @@ class MultiGraphBasedSSLModel(object):
         if not exact:
             if self.modelname == 'gr':
                 for k,yk in zip(Q, yQ): # done
-                    self.m += self.C[:, k] @ (yk - self.m[k])/(self.gamma**2 + self.C[k,k])
+                    self.m += self.C[:, k].reshape((-1, 1)) @ (yk - self.m[k])/(self.gamma**2 + self.C[k,k])
                     self.C -= np.outer(self.C[:,k], self.C[:,k])/(self.gamma**2. + self.C[k,k])
             elif self.modelname == 'probit-log':
                 for k,yk in zip(Q, yQ):
@@ -172,10 +172,10 @@ class MultiGraphBasedSSLModel(object):
             else:
                 raise ValueError("model name %s not recognized or implemented" % str(self.modelname))
             self.labeled += list(Q)
-            self.y += list(yQ)
+            self.y = np.concatenate((self.y, yQ))
         else:
             self.labeled += list(Q)
-            self.y += list(yQ)
+            self.y = np.concatenate((self.y, yQ))
             self.calculate_model(self.labeled, self.y)
 
         return
