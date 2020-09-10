@@ -240,6 +240,14 @@ def modelchange_gr(C, unlabeled, gamma, m):
     k_mc = unlabeled[np.argmax(mc)]
     return k_mc
 
+def modelchange_gr_multi(C, unlabeled, gamma, m):
+    '''
+    Compute the model change criterion under the probit model (with Gaussian approximations of Probit posterior).
+    '''
+    mc = [np.max(np.abs(m[k])) * np.linalg.norm(C[k,:]) / (gamma**2. + C[k,k]) for k in unlabeled]
+    k_mc = unlabeled[np.argmax(mc)]
+    return k_mc
+
 
 
 

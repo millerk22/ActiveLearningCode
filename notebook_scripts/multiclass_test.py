@@ -119,5 +119,3 @@ plt.figure()
 plt.scatter(X[:, 0], X[:, 1], c = np.array(RF.m[:,0]).flatten())
 plt.figure()
 plt.scatter(X[:, 0], X[:, 1], c = np.array(RF.m[:,1]).flatten())
-
-
