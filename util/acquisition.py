@@ -315,6 +315,21 @@ def modelchange_p(C, unlabeled, gamma, m, probit_norm=False, debug=False):
         return k_mc, mc
     return k_mc
 
+def modelchange_p_other(C, unlabeled, gamma, m, probit_norm=False, debug=False):
+    '''
+    Compute the model change criterion under the probit model (with Gaussian approximations of Probit posterior).
+    '''
+    if probit_norm:
+        mc = [np.absolute(jac_calc(m[k], np.sign(m[k]), gamma)/(1. + C[k,k]*hess_calc(m[k], np.sign(m[k]), gamma ))) \
+                       * np.linalg.norm(C[k,:]) for k in unlabeled]
+    else:
+        mc = [np.absolute(jac_calc2(m[k], np.sign(m[k]), gamma)/(1. + C[k,k]*hess_calc2(m[k], np.sign(m[k]), gamma )))\
+                       * np.linalg.norm(C[k,:]) for k in unlabeled]
+    k_mc = unlabeled[np.argmax(mc)]
+    if debug:
+        return k_mc, mc
+    return k_mc
+
 
 
 # Helper functions for MBR probit adaptation
@@ -392,3 +407,22 @@ def uncertainty(unlabeled, m):
 
 def uncertainty_hf(m):
     return np.argmin(np.abs(m - 0.5))
+
+
+
+######################### Spectral Truncation MC Acquisition #################
+def modelchange_p_st(C_alpha, alpha, v_c, gamma, debug=False):
+    '''
+    This assumes that you give only the rows of the eigenvectors corresponding to the CANDIDATE set that you want
+    to evaluate the criterion on. the index returned is the index in the Candidate set list, not in the original
+    indices.
+    '''
+    uks = v_c @ alpha
+    C_a_vk = C_alpha @ (v_c.T)
+    mc = np.array([np.absolute(jac_calc2(uks[i], np.sign(uks[i]),gamma))/(1. + \
+        np.inner(v_c[i,:], C_a_vk[:,i])*hess_calc2(uks[i], np.sign(uks[i]),gamma))* np.linalg.norm(C_a_vk[:,i]) \
+                    for i in range(v_c.shape[0])])
+    k = np.argmax(mc)
+    if debug:
+        return k, mc
+    return k
