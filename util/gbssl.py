@@ -333,6 +333,122 @@ class BinaryGraphBasedSSLModelReduced(object):
         else:
             pass
 
+class MultiGraphBasedSSLModelReduced(object):
+    '''
+    NEED TO FINISH.. NEED TO PREPARE SO STORAGE IS IN ALPHA SPACE.
+    '''
+    def __init__(self, modelname, gamma, tau, v=None, w=None):
+        self.gamma = gamma
+        self.tau = tau
+        if v is None:
+            raise ValueError("Need to provide the eigenvectors in the variable 'v'")
+        if w is None:
+            raise ValueError("Need to provide the eigenvalues in the variable 'w'")
+        self.v = v
+        self.trunc = True
+        if self.v.shape[0] == self.v.shape[1]:
+            print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
+        self.w = w
+        self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
+        #self.d = self.w + self.tau**2.
+        if modelname not in VALID_MODELS:
+            raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
+        self.full_storage = False
+        self.modelname = modelname
+        self.m = None
+        self.alpha = None
+        self.C_a = None
+        return
+
+    def calculate_model(self, labeled, y):
+        self.alpha = self.get_alpha(labeled, y)
+        self.C_a = self.get_C_alpha(labeled, y)
+        self.m = self.v @ self.alpha
+        self.labeled = labeled
+        self.y = y
+        self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.v.shape[0])))
+        return
+
+    def update_model(self, Q, yQ, exact=False):
+        if self.alpha is None or self.C_a is None:
+            print("Previous model not defined, so assuming you are passing in initial labeled set and labelings...")
+            self.calculate_model(Q, yQ)
+            return
+        if not exact:
+            for k,yk in zip(Q, yQ):
+                C_a_vk = self.C_a @ (self.v[k,:].T)
+                ip = np.inner(self.v[k,:], C_a_vk)
+                mk = np.inner(self.v[k,:], self.alpha)
+                if self.modelname == 'gr':
+                    self.alpha += (yk - mk)/(self.gamma**2 + ip) * C_a_vk
+                    self.C_a -= np.outer(C_a_vk, C_a_vk)/(self.gamma**2. + ip)
+                elif self.modelname == 'probit-log':
+                    self.alpha -= jac_calc2(mk, yk, self.gamma) / (1. + ip * hess_calc2(mk, yk, self.gamma))*C_a_vk
+                    mk = np.inner(self.v[k,:], self.alpha)
+                    self.C_a -= hess_calc2(mk, yk, self.gamma)/(1. + ip * hess_calc2(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
+                elif self.modelname == 'probit-norm':
+                    self.alpha -= jac_calc(mk, yk, self.gamma) / (1. + ip * hess_calc(mk, yk, self.gamma))*C_a_vk
+                    mk = np.inner(self.v[k,:], self.alpha)
+                    self.C_a -= hess_calc(mk, yk, self.gamma)/(1. + ip * hess_calc(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
+                else:
+                    raise ValueError("model name %s not recognized or implemented" % str(model))
+            self.m = self.v @ self.alpha
+            self.labeled += list(Q)
+            self.y += list(yQ)
+        else:
+            self.labeled += list(Q)
+            self.y += list(yQ)
+            self.calculate_model(self.labeled, self.y)
+
+        return
+
+    def get_alpha(self, Z, y):
+        '''
+        TODO: implement different option for when there are fewer labels than eigenvalues...
+        '''
+        if self.modelname == "probit-norm":
+            return probit_map_st_alpha(Z, y,  self.gamma, self.d, self.v)
+            # if len(y) <= len(self.w):
+            #     return probit_map_dr(Z, y, self.gamma, self.Ct)
+            # else:
+            #     return probit_map_st(Z, y, self.gamma, self.d, self.v)
+        elif self.modelname == "probit-log":
+            return probit_map_st2_alpha(Z, y,  self.gamma, self.d, self.v)
+            # if len(y) <= len(self.w):
+            #     return probit_map_dr2(Z, y, self.gamma, self.Ct)
+            # else:
+            #     return probit_map_st2(Z, y, self.gamma, self.d, self.v)
+        elif self.modelname == "gr":
+            vZ = self.v[Z, :]
+            C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
+            return (1. / self.gamma**2.)* sp.linalg.inv(C_a) @ vZ.T @ np.array(y)
+        else:
+            pass
+
+    def get_C_alpha(self, Z, y):
+        '''
+        TODO: implement different option for when there are fewer labels than eigenvalues...
+        '''
+        if self.modelname == "probit-norm":
+            return Hess_inv_st_alpha(self.alpha, y, 1./self.d, self.v[Z,:], self.gamma)
+            # if len(y) <= len(self.w):
+            #     return Hess_inv(m, Z, y, self.gamma, self.Ct)
+            # else:
+            #     return Hess_inv_st(m, Z, y, self.d, self.v, self.gamma)
+
+        elif self.modelname == "probit-log":
+            return Hess_inv_st2_alpha(self.alpha, y, 1./self.d, self.v[Z,:], self.gamma)
+            # if len(y) <= len(self.w):
+            #     return Hess2_inv(m, Z, y, self.gamma, self.Ct)
+            # else:
+            #     return Hess2_inv_st2(m, Z, y, self.d, self.v, self.gamma)
+
+        elif self.modelname == "gr":
+            vZ = self.v[Z, :]
+            C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
+            return sp.linalg.inv(C_a)
+        else:
+            pass
 ##################################################################################
 ################### Helper Functions for Reduced Model ###########################
 ##################################################################################
