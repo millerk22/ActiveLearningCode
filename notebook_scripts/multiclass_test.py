@@ -119,3 +119,23 @@ plt.figure()
 plt.scatter(X[:, 0], X[:, 1], c = np.array(RF.m[:,0]).flatten())
 plt.figure()
 plt.scatter(X[:, 0], X[:, 1], c = np.array(RF.m[:,1]).flatten())
+
+# %autoreload 2
+RFg = MultiGraphBasedSSLModelReduced('gr', gamma, tau, v=v[:,:300], w=w[:300])
+RFg.calculate_model(labeled, y)
+plt.figure()
+plt.scatter(X[:, 0], X[:, 1], c = np.array(FFg.m[:,0]).flatten())
+plt.figure()
+plt.scatter(X[:, 0], X[:, 1], c = np.array(FFg.m[:,1]).flatten())
+
+# +
+Q = np.random.choice(FFg.unlabeled, 5, replace=False)
+yQ = onehot_labels[Q]
+
+FFg.update_model(Q, yQ)
+# -
+
+plt.figure()
+plt.scatter(X[:, 0], X[:, 1], c = np.array(FFg.m[:,0]).flatten())
+plt.figure()
+plt.scatter(X[:, 0], X[:, 1], c = np.array(FFg.m[:,1]).flatten())

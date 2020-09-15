@@ -387,11 +387,13 @@ class MultiGraphBasedSSLModelReduced(object):
             return
         if not exact:
             for k,yk in zip(Q, yQ):
-                C_a_vk = self.C_a @ (self.v[k,:].T)
-                ip = np.inner(self.v[k,:], C_a_vk)
-                mk = np.inner(self.v[k,:], self.alpha)
+                C_a_vk = self.C_a @ (self.v[k,:].reshape((-1, 1)))
+                ip = self.v[k, :] @ C_a_vk
+                mk = self.v[k, :] @ self.alpha 
+                # ip = np.inner(self.v[k,:], C_a_vk)
+                # mk = np.inner(self.v[k,:], self.alpha)
                 if self.modelname == 'gr':
-                    self.alpha += (yk - mk)/(self.gamma**2 + ip) * C_a_vk
+                    self.alpha += C_a_vk @ (yk - mk)/(self.gamma**2 + ip) 
                     self.C_a -= np.outer(C_a_vk, C_a_vk)/(self.gamma**2. + ip)
                 elif self.modelname == 'probit-log':
                     self.alpha -= jac_calc2(mk, yk, self.gamma) / (1. + ip * hess_calc2(mk, yk, self.gamma))*C_a_vk
@@ -432,6 +434,7 @@ class MultiGraphBasedSSLModelReduced(object):
         elif self.modelname == "gr":
             vZ = self.v[Z, :]
             C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
+            print(vZ.shape, C_a.shape, y.shape)
             return (1. / self.gamma**2.)* sp.linalg.inv(C_a) @ vZ.T @ np.array(y)
         else:
             pass
