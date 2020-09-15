@@ -232,6 +232,17 @@ def get_acc(u, labels, unlabeled = None):
     else:
         corr = sum(1.*(u_[unlabeled] == labels[unlabeled]))
         return corr, corr/len(unlabeled)
+def get_acc_multi(u, labels, unlabeled=None):
+    """
+    Assuming that u and labels are NOT in one-hot encoding. i.e. ith entry of
+    u and labels is the integer class in {0,1,2,...num_classes}.
+    """
+    if unlabeled is None:
+        corr = sum(1.*(u == labels))
+        return corr, corr/u.shape[0]
+    else:
+        corr = sum(1.*(u[unlabeled] == labels[unlabeled]))
+        return corr, corr/len(unlabeled)
 
 
 
@@ -425,18 +436,29 @@ def probit_map_st(Z, y, gamma, w, v):
     #print(f"Root Finding is successful: {res.success}")
     return v @ res.x
 
+# OLD Code
+# def Hess_inv_st(u, Z, y, w, v, gamma, debug=False):
+#     """
+#     Assuming matrices are sparse, since L_tau should be relatively sparse,
+#         and we are perturbing with diagonal matrix.
+#     """
+#     H_d = np.zeros(u.shape[0])
+#     for j, yj in zip(Z, y):
+#         H_d[j] = hess_calc(u[j], yj, gamma)
+#     post = sp.sparse.diags(w, format='csr') \
+#            + v.T @ sp.sparse.diags(H_d, format='csr') @ v
+#     return v @ sp.linalg.inv(post) @ v.T
 
 def Hess_inv_st(u, Z, y, w, v, gamma, debug=False):
-    """
-    Assuming matrices are sparse, since L_tau should be relatively sparse,
-        and we are perturbing with diagonal matrix.
-    """
-    H_d = np.zeros(u.shape[0])
-    for j, yj in zip(Z, y):
-        H_d[j] = hess_calc(u[j], yj, gamma)
+    H_d = np.zeros(len(Z))
+    vZ = v[Z,:]
+    for i, (j, yj) in enumerate(zip(Z, y)):
+        H_d[i] = hess_calc2(u[j], yj, gamma)
     post = sp.sparse.diags(w, format='csr') \
-           + v.T @ sp.sparse.diags(H_d, format='csr') @ v
+           + vZ.T @ sp.sparse.diags(H_d, format='csr') @ vZ
     return v @ sp.linalg.inv(post) @ v.T
+
+
 
 def probit_map_st2(Z, y,  gamma, w, v):
     N = v.shape[0]
@@ -463,17 +485,28 @@ def probit_map_st2(Z, y,  gamma, w, v):
     #print(f"Root Finding is successful: {res.success}")
     return v @ res.x
 
+# OLD code
+# def Hess_inv_st2(u, Z, y, w, v, gamma, debug=False):
+#     """
+#     Assuming matrices are sparse, since L_tau should be relatively sparse,
+#         and we are perturbing with diagonal matrix.
+#     """
+#     H_d = np.zeros(u.shape[0])
+#     for j, yj in zip(Z, y):
+#         H_d[j] = hess_calc2(u[j], yj, gamma)
+#     post = sp.sparse.diags(w, format='csr') \
+#            + v.T @ sp.sparse.diags(H_d, format='csr') @ v
+#     return v @ sp.linalg.inv(post) @ v.T
+
 def Hess_inv_st2(u, Z, y, w, v, gamma, debug=False):
-    """
-    Assuming matrices are sparse, since L_tau should be relatively sparse,
-        and we are perturbing with diagonal matrix.
-    """
-    H_d = np.zeros(u.shape[0])
-    for j, yj in zip(Z, y):
-        H_d[j] = hess_calc2(u[j], yj, gamma)
+    H_d = np.zeros(len(Z))
+    vZ = v[Z,:]
+    for i, (j, yj) in enumerate(zip(Z, y)):
+        H_d[i] = hess_calc2(u[j], yj, gamma)
     post = sp.sparse.diags(w, format='csr') \
-           + v.T @ sp.sparse.diags(H_d, format='csr') @ v
+           + vZ.T @ sp.sparse.diags(H_d, format='csr') @ vZ
     return v @ sp.linalg.inv(post) @ v.T
+
 
 def Hess_inv(u, Z, y, gamma, Ct):
     Ctp = Ct[np.ix_(Z, Z)]
@@ -491,12 +524,20 @@ def Hess2_inv(u, Z, y, gamma, Ct):
     temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
     return Ct - Ct[:, Z] @ temp @ Ct[Z, :]
 
-def gr_C(Z, gamma, Ct):
-    Ctp = Ct[np.ix_(Z, Z)]
-    H_d = np.ones(len(Z)) * (gamma * gamma)
-    temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
-    return Ct - Ct[:, Z] @ temp @ Ct[Z, :]
+# OLD inefficient
+# def gr_C(Z, gamma, Ct):
+#     Ctp = Ct[np.ix_(Z, Z)]
+#     H_d = np.ones(len(Z)) * (gamma * gamma)
+#     temp = sp.linalg.inv(sp.sparse.diags(H_d, format='csr') + Ctp)
+#     return Ct - Ct[:, Z] @ temp @ Ct[Z, :]
 
-def gr_map(Z, y, gamma, Ct):
-    C = gr_C(Z, gamma, Ct)
+def gr_C(Z, gamma, d, v):
+    H_d = len(Z) *[1./gamma**2.]
+    vZ = v[Z,:]
+    post = sp.sparse.diags(d, format='csr') \
+           + vZ.T @ sp.sparse.diags(H_d, format='csr') @ vZ
+    return v @ sp.linalg.inv(post) @ v.T
+
+def gr_map(Z, y, gamma, d, v):
+    C = gr_C(Z, gamma, d, v)
     return (C[:,Z] @ y)/(gamma * gamma)

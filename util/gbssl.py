@@ -103,7 +103,8 @@ class BinaryGraphBasedSSLModel(object):
             else:
                 return Hess_inv_st2(m, Z, y, self.d, self.v, self.gamma)
         elif self.modelname == "gr":
-            return gr_C(Z, self.gamma, self.Ct)
+            #return gr_C(Z, self.gamma, self.Ct) # old
+            return gr_C(Z, self.gamma, self.d, self.v)
         else:
             raise ValueError("did not recognize modelname = %s" % self.modelname)
 
@@ -144,8 +145,12 @@ class MultiGraphBasedSSLModel(object):
         return
 
     def calculate_model(self, labeled, y):
-        self.m = self.get_m(labeled, y)
-        self.C = self.get_C(labeled, y, self.m)
+        if self.modelname == 'gr':
+            self.C = gr_C(labeled, self.gamma, self.d, self.v)
+            self.m = (self.C[:,labeled] @ y)/(self.gamma**2.)
+        else:
+            self.m = self.get_m(labeled, y)
+            self.C = self.get_C(labeled, y, self.m)
         self.labeled = labeled
         self.y = y
         self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.C.shape[0])))
@@ -157,23 +162,26 @@ class MultiGraphBasedSSLModel(object):
             self.calculate_model(Q, yQ)
             return
         if not exact:
+            print("... Updating model with NA updates ...")
             if self.modelname == 'gr':
                 for k,yk in zip(Q, yQ): # done
                     self.m += self.C[:, k].reshape((-1, 1)) @ (yk - self.m[k])/(self.gamma**2 + self.C[k,k])
                     self.C -= np.outer(self.C[:,k], self.C[:,k])/(self.gamma**2. + self.C[k,k])
-            elif self.modelname == 'probit-log':
-                for k,yk in zip(Q, yQ):
-                    self.m -= jac_calc2(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*self.C[k,:]
-                    self.C -= hess_calc2(self.m[k], yk, self.gamma)/(1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
-            elif self.modelname == 'probit-norm':
-                for k,yk in zip(Q, yQ):
-                    self.m -= jac_calc(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc(self.m[k], yk, self.gamma))*self.C[k,:]
-                    self.C -= hess_calc(self.m[k], yk, self.gamma)/(1. + self.C[k,k]*hess_calc(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
+            # Probit not implemented for Multiclass
+            # elif self.modelname == 'probit-log':
+            #     for k,yk in zip(Q, yQ):
+            #         self.m -= jac_calc2(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*self.C[k,:]
+            #         self.C -= hess_calc2(self.m[k], yk, self.gamma)/(1. + self.C[k,k] * hess_calc2(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
+            # elif self.modelname == 'probit-norm':
+            #     for k,yk in zip(Q, yQ):
+            #         self.m -= jac_calc(self.m[k], yk, self.gamma) / (1. + self.C[k,k] * hess_calc(self.m[k], yk, self.gamma))*self.C[k,:]
+            #         self.C -= hess_calc(self.m[k], yk, self.gamma)/(1. + self.C[k,k]*hess_calc(self.m[k], yk, self.gamma))*np.outer(self.C[k,:], self.C[k,:])
             else:
                 raise ValueError("model name %s not recognized or implemented" % str(self.modelname))
             self.labeled += list(Q)
             self.y = np.concatenate((self.y, yQ))
         else:
+            print("... Updating model with EXACT updates ...")
             self.labeled += list(Q)
             self.y = np.concatenate((self.y, yQ))
             self.calculate_model(self.labeled, self.y)
@@ -181,34 +189,37 @@ class MultiGraphBasedSSLModel(object):
         return
 
     def get_m(self, Z, y):
-        if self.modelname == "probit-norm":
-            if len(y) <= len(self.w):
-                return probit_map_dr(Z, y, self.gamma, self.Ct)
-            else:
-                return probit_map_st(Z, y, self.gamma, self.d, self.v)
-        elif self.modelname == "probit-log":
-            if len(y) <= len(self.w):
-                return probit_map_dr2(Z, y, self.gamma, self.Ct)
-            else:
-                return probit_map_st2(Z, y, self.gamma, self.d, self.v)
-        elif self.modelname == "gr":
-            return gr_map(Z, y, self.gamma, self.Ct)
+        # PROBIT NOT IMPLEMENTED FOR MULTI
+        # if self.modelname == "probit-norm":
+        #     if len(y) <= len(self.w):
+        #         return probit_map_dr(Z, y, self.gamma, self.Ct)
+        #     else:
+        #         return probit_map_st(Z, y, self.gamma, self.d, self.v)
+        # elif self.modelname == "probit-log":
+        #     if len(y) <= len(self.w):
+        #         return probit_map_dr2(Z, y, self.gamma, self.Ct)
+        #     else:
+        #         return probit_map_st2(Z, y, self.gamma, self.d, self.v)
+        if self.modelname == "gr":
+            return gr_map(Z, y, self.gamma, self.d, self.v)
         else:
             raise ValueError("did not recognize modelname = %s" % self.modelname)
 
     def get_C(self, Z, y, m):
-        if self.modelname == "probit-norm":
-            if len(y) <= len(self.w) or not self.trunc:
-                return Hess_inv(m, Z, y, self.gamma, self.Ct)
-            else:
-                return Hess_inv_st(m, Z, y, self.d, self.v, self.gamma)
-        elif self.modelname == "probit-log":
-            if len(y) <= len(self.w) or not self.trunc:
-                return Hess2_inv(m, Z, y, self.gamma, self.Ct)
-            else:
-                return Hess_inv_st2(m, Z, y, self.d, self.v, self.gamma)
-        elif self.modelname == "gr":
-            return gr_C(Z, self.gamma, self.Ct)
+        # PROBIT NOT IMPLEMENTED FOR MULTI
+        # if self.modelname == "probit-norm":
+        #     if len(y) <= len(self.w) or not self.trunc:
+        #         return Hess_inv(m, Z, y, self.gamma, self.Ct)
+        #     else:
+        #         return Hess_inv_st(m, Z, y, self.d, self.v, self.gamma)
+        # elif self.modelname == "probit-log":
+        #     if len(y) <= len(self.w) or not self.trunc:
+        #         return Hess2_inv(m, Z, y, self.gamma, self.Ct)
+        #     else:
+        #         return Hess_inv_st2(m, Z, y, self.d, self.v, self.gamma)
+        if self.modelname == "gr":
+            #return gr_C(Z, self.gamma, self.Ct)
+            return gr_C(Z, self.gamma, self.d, self.v)
         else:
             raise ValueError("did not recognize modelname = %s" % self.modelname)
 
@@ -258,7 +269,7 @@ class BinaryGraphBasedSSLModelReduced(object):
             self.calculate_model(Q, yQ)
             return
         if not exact:
-            for k,yk in zip(Q, yQ):
+            for k, yk in zip(Q, yQ):
                 C_a_vk = self.C_a @ (self.v[k,:].T)
                 ip = np.inner(self.v[k,:], C_a_vk)
                 mk = np.inner(self.v[k,:], self.alpha)

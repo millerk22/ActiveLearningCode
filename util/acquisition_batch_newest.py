@@ -15,15 +15,18 @@ def sgn(x):
 def mc_full(Cand, m, C, modelname, gamma=0.1):
     if modelname not in MODELS:
         raise ValueError("%s is not a valid model name, must be in %s" % (modelname, MODELS))
-
-    if modelname == 'probit-log':
-        return np.array([np.absolute(jac_calc2(m[k], sgn(m[k]), gamma)/(1. + C[k,k]*hess_calc2(m[k], sgn(m[k]), gamma)) \
-                       * np.linalg.norm(C[:,k]) for k in Cand])
-    elif modelname == 'probit-norm':
-        return np.array([np.absolute(jac_calc(m[k], sgn(m[k]), gamma)/(1. + C[k,k]*hess_calc(m[k], sgn(m[k]), gamma)) \
-                       * np.linalg.norm(C[:,k]) for k in Cand])
+    if len(m.shape) > 1: # Multiclass case
+        if modelname == 'gr':
+            return np.array([ np.sqrt(np.inner(m[k,:], m[k,:])[0,0] + 1. - 2.*np.max(m[k,:])) * np.linalg.norm(C[:,k])/(gamma**2. + C[k,k]) for k in Cand])
     else:
-        return np.array([np.absolute(m[k] - sgn(m[k]))/(gamma**2. + C[k,k]) * np.linalg.norm(C[:,k]) for k in Cand])
+        if modelname == 'probit-log':
+            return np.array([np.absolute(jac_calc2(m[k], sgn(m[k]), gamma))/(1. + C[k,k]*hess_calc2(m[k], sgn(m[k]), gamma)) \
+                           * np.linalg.norm(C[:,k]) for k in Cand])
+        elif modelname == 'probit-norm':
+            return np.array([np.absolute(jac_calc(m[k], sgn(m[k]), gamma))/(1. + C[k,k]*hess_calc(m[k], sgn(m[k]), gamma)) \
+                           * np.linalg.norm(C[:,k]) for k in Cand])
+        else:
+            return np.array([np.absolute(m[k] - sgn(m[k]))/(gamma**2. + C[k,k]) * np.linalg.norm(C[:,k]) for k in Cand])
 
 def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1):
     if modelname not in MODELS:
