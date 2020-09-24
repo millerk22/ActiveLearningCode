@@ -9,7 +9,7 @@ from .acquisition_batch_newest import *
 
 
 ACQUISITIONS = ['mc', 'uncertainty', 'rand']
-MODELS = ['gr', 'probit-log', 'probit-norm']
+MODELS = ['gr', 'probit-log', 'probit-norm', 'softmax']
 CANDIDATES = ['rand', 'full', 'dijkstra']
 SELECTION_METHODS = ['top', 'prop', '']
 
@@ -81,26 +81,27 @@ class ActiveLearner(object):
             raise NotImplementedError("Have not implemented the dikstra candidate selection for this class")
         else:
             Cand = model.unlabeled
-
-        # Compute acquisition values
-        acq_vals = acquisition_values(self.acquisition, Cand, model)
-        if len(acq_vals.shape) > 1:
+        if debug:
+            self.Cand = Cand
+        # Compute acquisition values -- save as object attribute for later plotting
+        self.acq_vals = acquisition_values(self.acquisition, Cand, model)
+        if len(self.acq_vals.shape) > 1:
             print("WARNING: acq_vals is of shape %s, should be one-dimensional. MIGHT CAUSE PROBLEM" % str(acq_vals.shape))
 
         # based on selection method, choose query points
         if B == 1:
             if method != 'top':
                 print("Warning : B = 1 but election method is not 'top'. Overriding selection method and selecting top choice for query point.")
-                return [Cand[np.argmax(acq_vals)]]
+            return [Cand[np.argmax(self.acq_vals)]]
         else:
             if method == 'top':
-                return [Cand[k] for k in (-acq_vals).argsort()[:B]]
+                return [Cand[k] for k in (-self.acq_vals).argsort()[:B]]
 
             elif method == 'prop':
                 if prop_func is None:
                     # if not given a customized proportionality sampling function, use this default.
                     # (1) normalize to be 0 to 1
-                    acq_vals = (acq_vals - np.min(acq_vals))/(np.max(acq_vals) - np.min(acq_vals))
+                    acq_vals = (self.acq_vals - np.min(self.acq_vals))/(np.max(self.acq_vals) - np.min(self.acq_vals))
                     p = np.exp(acq_vals/prop_sigma)
                     p /= np.sum(p)
                 else:

@@ -344,11 +344,12 @@ class BinaryGraphBasedSSLModelReduced(object):
         else:
             pass
 
-class MultiGraphBasedSSLModelReduced(object):
+
+class SoftmaxGraphBasedSSLModelReduced(object):
     '''
-    NEED TO FINISH.. NEED TO PREPARE SO STORAGE IS IN ALPHA SPACE.
+
     '''
-    def __init__(self, modelname, gamma, tau, v=None, w=None):
+    def __init__(self, gamma, tau, v=None, w=None):
         self.gamma = gamma
         self.tau = tau
         if v is None:
@@ -357,112 +358,118 @@ class MultiGraphBasedSSLModelReduced(object):
             raise ValueError("Need to provide the eigenvalues in the variable 'w'")
         self.v = v
         self.trunc = True
+        self.N, self.M = self.v.shape
         if self.v.shape[0] == self.v.shape[1]:
             print("Warning : It appears that you've given the full spectrum, this class is not optimized for that case...")
         self.w = w
         self.d = (self.tau ** (-2.)) * ((self.w + self.tau**2.))
         #self.d = self.w + self.tau**2.
-        if modelname not in VALID_MODELS:
-            raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
+        # if modelname not in VALID_MODELS:
+        #     raise ValueError("%s is not a valid modelname, must be in %s" % (modelname, str(VALID_MODELS)))
         self.full_storage = False
-        self.modelname = modelname
+        self.modelname = "softmax"
         self.m = None
         self.alpha = None
         self.C_a = None
         return
 
     def calculate_model(self, labeled, y):
-        self.alpha = self.get_alpha(labeled, y)
-        self.C_a = self.get_C_alpha(labeled, y)
-        self.m = self.v @ self.alpha
+        self.nc = y.shape[1]
+        self.alpha, H_a = self.get_alpha(labeled, y)
+        self.C_a = sp.linalg.inv(H_a)
+        #self.C_a = self.get_C_alpha(labeled, y)
+        self.m = self.v @ (self.alpha.reshape(self.nc, self.M).T)
+        self.y = np.array(y)
         self.labeled = labeled
-        self.y = y
-        self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.v.shape[0])))
+        self.unlabeled = list(filter(lambda x: x not in self.labeled, range(self.N)))
         return
 
-    def update_model(self, Q, yQ, exact=False):
+    def update_model(self, Q, yQ, exact=True):
         if self.alpha is None or self.C_a is None:
             print("Previous model not defined, so assuming you are passing in initial labeled set and labelings...")
             self.calculate_model(Q, yQ)
             return
         if not exact:
-            for k,yk in zip(Q, yQ):
-                C_a_vk = self.C_a @ (self.v[k,:].reshape((-1, 1)))
-                ip = self.v[k, :] @ C_a_vk
-                mk = self.v[k, :] @ self.alpha 
-                # ip = np.inner(self.v[k,:], C_a_vk)
-                # mk = np.inner(self.v[k,:], self.alpha)
-                if self.modelname == 'gr':
-                    self.alpha += C_a_vk @ (yk - mk)/(self.gamma**2 + ip) 
-                    self.C_a -= np.outer(C_a_vk, C_a_vk)/(self.gamma**2. + ip)
-                elif self.modelname == 'probit-log':
-                    self.alpha -= jac_calc2(mk, yk, self.gamma) / (1. + ip * hess_calc2(mk, yk, self.gamma))*C_a_vk
-                    mk = np.inner(self.v[k,:], self.alpha)
-                    self.C_a -= hess_calc2(mk, yk, self.gamma)/(1. + ip * hess_calc2(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
-                elif self.modelname == 'probit-norm':
-                    self.alpha -= jac_calc(mk, yk, self.gamma) / (1. + ip * hess_calc(mk, yk, self.gamma))*C_a_vk
-                    mk = np.inner(self.v[k,:], self.alpha)
-                    self.C_a -= hess_calc(mk, yk, self.gamma)/(1. + ip * hess_calc(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
-                else:
-                    raise ValueError("model name %s not recognized or implemented" % str(model))
-            self.m = self.v @ self.alpha
-            self.labeled += list(Q)
-            self.y += list(yQ)
+            raise NotImplementedError("Have not implemented inexact NA updates for this model yet")
+            # for k, yk in zip(Q, yQ):
+            #     C_a_vk = self.C_a @ (self.v[k,:].T)
+            #     ip = np.inner(self.v[k,:], C_a_vk)
+            #     mk = np.inner(self.v[k,:], self.alpha)
+            #     if self.modelname == 'gr':
+            #         self.alpha += (yk - mk)/(self.gamma**2 + ip) * C_a_vk
+            #         self.C_a -= np.outer(C_a_vk, C_a_vk)/(self.gamma**2. + ip)
+            #     elif self.modelname == 'probit-log':
+            #         self.alpha -= jac_calc2(mk, yk, self.gamma) / (1. + ip * hess_calc2(mk, yk, self.gamma))*C_a_vk
+            #         mk = np.inner(self.v[k,:], self.alpha)
+            #         self.C_a -= hess_calc2(mk, yk, self.gamma)/(1. + ip * hess_calc2(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
+            #     elif self.modelname == 'probit-norm':
+            #         self.alpha -= jac_calc(mk, yk, self.gamma) / (1. + ip * hess_calc(mk, yk, self.gamma))*C_a_vk
+            #         mk = np.inner(self.v[k,:], self.alpha)
+            #         self.C_a -= hess_calc(mk, yk, self.gamma)/(1. + ip * hess_calc(mk, yk, self.gamma))*np.outer(C_a_vk, C_a_vk)
+            #     else:
+            #         raise ValueError("model name %s not recognized or implemented" % str(model))
+            # self.m = self.v @ self.alpha
+            # self.labeled += list(Q)
+            # self.y += list(yQ)
         else:
+            print("-- Updating Softmax model Exactly --")
             self.labeled += list(Q)
-            self.y += list(yQ)
+            self.y = np.concatenate((self.y, yQ))
             self.calculate_model(self.labeled, self.y)
 
         return
 
-    def get_alpha(self, Z, y):
+    def get_alpha(self, Z, y, newton=True):
+        ''' Calculate the SoftMax MAP estimator
+
+        Z : list of labeled nodes
+        y : (len(Z_), nc) numpy array of onehot vectors as rows
         '''
-        TODO: implement different option for when there are fewer labels than eigenvalues...
-        '''
-        if self.modelname == "probit-norm":
-            return probit_map_st_alpha(Z, y,  self.gamma, self.d, self.v)
-            # if len(y) <= len(self.w):
-            #     return probit_map_dr(Z, y, self.gamma, self.Ct)
-            # else:
-            #     return probit_map_st(Z, y, self.gamma, self.d, self.v)
-        elif self.modelname == "probit-log":
-            return probit_map_st2_alpha(Z, y,  self.gamma, self.d, self.v)
-            # if len(y) <= len(self.w):
-            #     return probit_map_dr2(Z, y, self.gamma, self.Ct)
-            # else:
-            #     return probit_map_st2(Z, y, self.gamma, self.d, self.v)
-        elif self.modelname == "gr":
-            vZ = self.v[Z, :]
-            C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
-            print(vZ.shape, C_a.shape, y.shape)
-            return (1. / self.gamma**2.)* sp.linalg.inv(C_a) @ vZ.T @ np.array(y)
+
+        y = np.array(y) # in case y is a numpy matrix instead of numpy array
+        vZ_ = self.v[Z,:]/self.gamma
+
+        def f(x):
+            pi_Z = np.exp(vZ_ @ x.reshape(self.nc, self.M).T)
+            pi_Z /= np.sum(pi_Z, axis=1)[:, np.newaxis]
+            vec = np.empty(self.M*self.nc)
+            for c in range(self.nc):
+                vec[c*self.M:(c+1)*self.M] = vZ_.T @ (pi_Z[:,c] - y[:,c])
+            return np.tile(self.d, (1,self.nc)).flatten() * x + vec
+
+        def fprime(x):
+            pi_Z = np.exp(vZ_ @ x.reshape(self.nc, self.M).T)
+            pi_Z /= np.sum(pi_Z, axis=1)[:, np.newaxis]
+            H = np.empty((self.M*self.nc, self.M*self.nc))
+            for c in range(self.nc):
+                for m in range(c,self.nc):
+                    Bmc = 1.*(m == c)*pi_Z[:,c] - pi_Z[:,c]*pi_Z[:,m]
+                    H[c*self.M:(c+1)*self.M, m*self.M:(m+1)*self.M] = (vZ_.T * Bmc) @ vZ_
+                    if m != c:
+                        H[m*self.M:(m+1)*self.M, c*self.M:(c+1)*self.M] = H[c*self.M:(c+1)*self.M, m*self.M:(m+1)*self.M]
+
+            H.ravel()[::(self.M*self.nc+1)] += np.tile(self.d, (1, self.nc)).flatten()
+            return H
+
+        x0 = np.random.randn(self.N, self.nc)
+        x0[Z,:] = y
+        x0 = (self.v.T @ x0).T.flatten()
+        if newton:
+            #print("Second Order")
+            res = root(f, x0, jac=fprime, tol=1e-9)
         else:
-            pass
+            #print("First Order")
+            res = root(f, x0, tol=1e-10, method='krylov')
+        if not res.success:
+            print(res.success)
+            print(np.linalg.norm(f(res.x)))
+            print(res.message)
+            res = root(f,x0, tol=1e-10, method='krylov')
 
-    def get_C_alpha(self, Z, y):
-        '''
-        TODO: implement different option for when there are fewer labels than eigenvalues...
-        '''
-        if self.modelname == "probit-norm":
-            return Hess_inv_st_alpha(self.alpha, y, 1./self.d, self.v[Z,:], self.gamma)
-            # if len(y) <= len(self.w):
-            #     return Hess_inv(m, Z, y, self.gamma, self.Ct)
-            # else:
-            #     return Hess_inv_st(m, Z, y, self.d, self.v, self.gamma)
+        # return both alpha and H_a, the Hessian at alpha
+        return res.x, fprime(res.x)
 
-        elif self.modelname == "probit-log":
-            return Hess_inv_st2_alpha(self.alpha, y, 1./self.d, self.v[Z,:], self.gamma)
-            # if len(y) <= len(self.w):
-            #     return Hess2_inv(m, Z, y, self.gamma, self.Ct)
-            # else:
-            #     return Hess2_inv_st2(m, Z, y, self.d, self.v, self.gamma)
 
-        elif self.modelname == "gr":
-            vZ = self.v[Z, :]
-            C_a = np.diag(self.d) + vZ.T @ vZ / (self.gamma**2.)
-            return sp.linalg.inv(C_a)
-        else:
-            pass
 ##################################################################################
 ################### Helper Functions for Reduced Model ###########################
 ##################################################################################
