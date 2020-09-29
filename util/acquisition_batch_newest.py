@@ -30,14 +30,13 @@ def mc_full(Cand, m, C, modelname, gamma=0.1):
         else:
             return np.array([np.absolute(m[k] - sgn(m[k]))/(gamma**2. + C[k,k]) * np.linalg.norm(C[:,k]) for k in Cand])
 
-def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1):
+def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1, verbose=False):
     if modelname not in MODELS:
         raise ValueError("%s is not a valid model name, must be in %s" % (modelname, MODELS))
 
     if modelname == 'softmax':
         num_cand, M = v_Cand.shape
         nc = alpha.shape[0]//M
-        print(nc)
 
         if uks is None:
             uks = v_Cand @ (alpha.reshape(nc, M).T)
@@ -69,7 +68,7 @@ def mc_reduced(C_a, alpha, v_Cand, modelname, uks=None, gamma=0.1):
             argmin_mcvals = np.argmin(mc_vals_for_k)
             argmax_piks = np.argmax(piks[k,:])
 
-            if argmin_mcvals != argmax_piks:
+            if (argmin_mcvals != argmax_piks) and verbose:
                 print("%d (index in Cand) did Not choose choice that we thought" % k)
 
 
